@@ -11,7 +11,7 @@
  * Requires: plans.json hosted at https://papiofficial.github.io/rsa/plans.json
  */
 
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
   const PLANS_URL = 'https://papiofficial.github.io/rsa/plans.json';
 
   // ─── Shared: fetch plans data ────────────────────────────────────────────────
@@ -195,4 +195,4 @@
     }
   }
 
-})();
+});
