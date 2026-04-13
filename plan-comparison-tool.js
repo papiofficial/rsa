@@ -95,6 +95,20 @@
   const interactiveContainer = document.getElementById('plan-comparison-tool');
   if (interactiveContainer) {
     fetchPlans().then(plans => {
+      // Check if page has pre-set plan slugs via data attributes on any ancestor
+      const presetWrapper = document.querySelector('[data-plan-1]');
+      if (presetWrapper) {
+        const slug1 = presetWrapper.dataset.plan1;
+        const slug2 = presetWrapper.dataset.plan2;
+        if (slug1 && slug2) {
+          const plan1 = plans.find(p => p.slug === slug1);
+          const plan2 = plans.find(p => p.slug === slug2);
+          if (plan1 && plan2) {
+            renderComparison(plan1, plan2, interactiveContainer);
+            return;
+          }
+        }
+      }
       // Extract unique states
       const states = [...new Set(plans.map(p => p.state))].filter(Boolean).sort();
 
