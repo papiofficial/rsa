@@ -51,14 +51,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const fmt = v => (v === null || v === undefined || v === '') ? '—' : v;
     const star = v => v ? '⭐'.repeat(Math.round(v)) + ` (${v})` : '—';
 
+    const BASE = 'https://www.restingsycamore.com/medicare';
+    function link(href, text) {
+      return href ? `<a href="${href}" style="color:inherit;text-decoration:underline;">${text}</a>` : text;
+    }
+    function cellVal(f, plan) {
+      const v = f.key === 'star-rating' ? star(plan[f.key]) : fmt(plan[f.key]);
+      if (f.key === 'carrier') return link(plan['carrier-slug'] ? `${BASE}/carriers/${plan['carrier-slug']}` : '', v);
+      if (f.key === 'plan-type') return link(plan['plan-type-slug'] ? `${BASE}/plan-types/${plan['plan-type-slug']}` : '', v);
+      if (f.key === 'state') return link(plan['state-slug'] ? `${BASE}/states/${plan['state-slug']}` : '', v);
+      return v;
+    }
+
     const rows = fields.map(f => {
       const isDiff = diffs.has(f.key);
-      const val1 = f.key === 'star-rating' ? star(plan1[f.key]) : fmt(plan1[f.key]);
-      const val2 = f.key === 'star-rating' ? star(plan2[f.key]) : fmt(plan2[f.key]);
       return `<tr class="${isDiff ? 'comp-diff' : ''}">
         <td class="comp-label">${f.label}</td>
-        <td class="comp-val">${val1}</td>
-        <td class="comp-val">${val2}</td>
+        <td class="comp-val">${cellVal(f, plan1)}</td>
+        <td class="comp-val">${cellVal(f, plan2)}</td>
       </tr>`;
     }).join('');
 
@@ -71,6 +81,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>`
       : '<div class="comp-key-diffs"><p>These plans are identical across all compared fields.</p></div>';
 
+    const planLink = (plan) => link(`${BASE}/plans/${plan.slug}`, plan.name);
     container.innerHTML = `
       <div class="comp-wrap">
         <div class="comp-table-wrap">
@@ -78,8 +89,8 @@ document.addEventListener('DOMContentLoaded', function () {
             <thead>
               <tr>
                 <th></th>
-                <th class="comp-plan-name">${plan1.name}</th>
-                <th class="comp-plan-name">${plan2.name}</th>
+                <th class="comp-plan-name">${planLink(plan1)}</th>
+                <th class="comp-plan-name">${planLink(plan2)}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
