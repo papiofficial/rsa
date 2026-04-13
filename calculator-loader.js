@@ -1,7 +1,7 @@
 (function() {
   var CALCULATORS = {};
 
-  CALCULATORS['hsa-calculator'] = function() {
+  CALCULATORS['hsa-calculator'] = function(container) {
     /**
  * Medicare & HSA Compatibility Checker
  * Once you enroll in Medicare Part A (even retroactively), you can no longer
@@ -195,7 +195,7 @@
 })();
   };
 
-  CALCULATORS['iep-calculator'] = function() {
+  CALCULATORS['iep-calculator'] = function(container) {
     /**
  * Medicare Initial Enrollment Period (IEP) Calculator
  * Embed: drop this in a Webflow custom code block on the IEP page.
@@ -328,7 +328,7 @@
 })();
   };
 
-  CALCULATORS['irmaa-calculator'] = function() {
+  CALCULATORS['irmaa-calculator'] = function(container) {
     /**
  * Medicare IRMAA Calculator (2026)
  * Income-Related Monthly Adjustment Amount for Part B and Part D
@@ -471,7 +471,7 @@
 })();
   };
 
-  CALCULATORS['cost-calculator'] = function() {
+  CALCULATORS['cost-calculator'] = function(container) {
     /**
  * Medicare Advantage vs. Medigap Total Annual Cost Estimator
  * Helps users compare realistic annual costs between two paths.
@@ -635,7 +635,7 @@
 })();
   };
 
-  CALCULATORS['msp-calculator'] = function() {
+  CALCULATORS['msp-calculator'] = function(container) {
     /**
  * Medicare Savings Program (MSP) Eligibility Screener (2026)
  * Helps low-income Medicare beneficiaries find out if they qualify for
@@ -826,7 +826,7 @@
 })();
   };
 
-  CALCULATORS['medigap-oe-calculator'] = function() {
+  CALCULATORS['medigap-oe-calculator'] = function(container) {
     /**
  * Medigap Open Enrollment Window Calculator
  * The 6-month guaranteed-issue Medigap window starts when you are BOTH:
@@ -980,7 +980,7 @@
 })();
   };
 
-  CALCULATORS['parta-calculator'] = function() {
+  CALCULATORS['parta-calculator'] = function(container) {
     /**
  * Medicare Part A Premium Calculator (2026)
  * Most people get Part A free — but not everyone. This calculates your premium
@@ -1091,7 +1091,7 @@
 })();
   };
 
-  CALCULATORS['partb-calculator'] = function() {
+  CALCULATORS['partb-calculator'] = function(container) {
     /**
  * Medicare Part B Late Enrollment Penalty Calculator
  * Embed: drop this in a Webflow custom code block on the Part B Penalty page.
@@ -1165,7 +1165,7 @@
 })();
   };
 
-  CALCULATORS['partd-calculator'] = function() {
+  CALCULATORS['partd-calculator'] = function(container) {
     /**
  * Medicare Part D Late Enrollment Penalty Calculator
  * Embed: drop this in a Webflow custom code block on the Part D Penalty page.
@@ -1239,7 +1239,7 @@
 })();
   };
 
-  CALCULATORS['sep-finder'] = function() {
+  CALCULATORS['sep-finder'] = function(container) {
     /**
  * Medicare Special Enrollment Period (SEP) Finder
  * Helps users determine if they currently have an SEP and how long it lasts.
@@ -1403,7 +1403,7 @@
 })();
   };
 
-  CALCULATORS['signup-quiz'] = function() {
+  CALCULATORS['signup-quiz'] = function(container) {
     /**
  * "When Should I Sign Up for Medicare?" Decision Quiz
  * Routes users to the right enrollment path based on their situation.
@@ -1641,12 +1641,31 @@
 })();
   };
 
-  // Find which calculator div is on this page and run it
-  var divIds = Object.keys(CALCULATORS);
-  for (var i = 0; i < divIds.length; i++) {
-    if (document.getElementById(divIds[i])) {
-      CALCULATORS[divIds[i]]();
-      break;
+  var SLUG_MAP = {
+    'hsa-compatibility': 'hsa-calculator',
+    'iep-calculator': 'iep-calculator',
+    'irmaa-calculator': 'irmaa-calculator',
+    'medicare-advantage-vs-medigap-cost': 'cost-calculator',
+    'medicare-savings-program': 'msp-calculator',
+    'medigap-open-enrollment': 'medigap-oe-calculator',
+    'part-a-premium': 'parta-calculator',
+    'part-b-penalty': 'partb-calculator',
+    'part-d-penalty': 'partd-calculator',
+    'special-enrollment-period': 'sep-finder',
+    'when-should-i-sign-up-for-medicare': 'signup-quiz',
+  };
+
+  // Detect current page from URL slug
+  var slug = window.location.pathname.split('/').pop();
+  var divId = SLUG_MAP[slug];
+  if (divId && CALCULATORS[divId]) {
+    // Ensure the target div exists
+    var container = document.getElementById(divId);
+    if (!container) {
+      // Try to find div-id-field and set its id correctly
+      var placeholder = document.querySelector('.div-id-field');
+      if (placeholder) { placeholder.id = divId; }
     }
+    CALCULATORS[divId]();
   }
 })();
