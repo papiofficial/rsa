@@ -1644,6 +1644,7 @@
   var SLUG_MAP = {
     'hsa-compatibility': 'hsa-calculator',
     'iep-calculator': 'iep-calculator',
+    'initial-enrollment-period': 'iep-calculator',
     'irmaa-calculator': 'irmaa-calculator',
     'medicare-advantage-vs-medigap-cost': 'cost-calculator',
     'medicare-savings-program': 'msp-calculator',
