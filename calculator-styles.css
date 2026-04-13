@@ -1,0 +1,215 @@
+/* Resting Sycamore — Medicare Calculator Shared Styles
+   Designer: plug these into your Webflow global CSS or a page-level <style> block.
+   Override colors/fonts to match your design system. */
+
+.calc-wrap {
+  max-width: 680px;
+  margin: 0 auto;
+  font-family: inherit;
+}
+
+.calc-desc {
+  margin-bottom: 1.5rem;
+  color: #444;
+  line-height: 1.6;
+}
+
+.calc-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.calc-fields label {
+  font-weight: 600;
+  margin-top: 0.75rem;
+  color: #222;
+}
+
+.calc-fields input,
+.calc-fields select {
+  padding: 0.6rem 0.75rem;
+  border: 1.5px solid #ccc;
+  border-radius: 6px;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 400px;
+  box-sizing: border-box;
+}
+
+.calc-fields input:focus,
+.calc-fields select:focus {
+  outline: none;
+  border-color: #0057a8; /* Replace with your brand color */
+}
+
+.calc-fields small {
+  color: #666;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+/* Primary button — replace colors with your brand */
+button[id$="-calculate"],
+#iep-calculate,
+#cost-calculate {
+  background: #0057a8;
+  color: #fff;
+  border: none;
+  padding: 0.75rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: background 0.2s;
+}
+
+button[id$="-calculate"]:hover,
+#iep-calculate:hover,
+#cost-calculate:hover {
+  background: #003f7a;
+}
+
+.calc-result {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: #f4f8ff;
+  border-left: 4px solid #0057a8;
+  border-radius: 6px;
+}
+
+.calc-result h3 {
+  margin-top: 0;
+  color: #0057a8;
+}
+
+.calc-result h4 {
+  margin-top: 1.25rem;
+  color: #222;
+}
+
+.calc-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+.calc-table th,
+.calc-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #dde6f0;
+  text-align: left;
+}
+
+.calc-table th {
+  background: #e6eef8;
+  font-weight: 600;
+}
+
+.calc-table tr.calc-total td {
+  font-weight: 700;
+  background: #dde9f8;
+  border-top: 2px solid #0057a8;
+}
+
+.calc-disclaimer {
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  color: #666;
+  line-height: 1.5;
+  border-top: 1px solid #dde6f0;
+  padding-top: 0.75rem;
+}
+
+.calc-good-news {
+  color: #1a7a3c;
+  font-size: 1.05rem;
+  margin-bottom: 1rem;
+}
+
+.calc-urgent {
+  color: #b00020;
+}
+
+/* Quiz styles */
+.quiz-question {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  color: #222;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.quiz-btn {
+  background: #fff;
+  border: 2px solid #0057a8;
+  color: #0057a8;
+  padding: 0.65rem 1rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.quiz-btn:hover {
+  background: #0057a8;
+  color: #fff;
+}
+
+.quiz-back,
+.quiz-restart {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  margin-top: 0.5rem;
+  text-decoration: underline;
+}
+
+.quiz-result {
+  padding: 1.25rem;
+  background: #f4f8ff;
+  border-left: 4px solid #0057a8;
+  border-radius: 6px;
+  margin-top: 1rem;
+}
+
+.quiz-result h3 {
+  margin-top: 0;
+  color: #0057a8;
+}
+
+.quiz-cta {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #fff;
+  border: 1.5px solid #0057a8;
+  border-radius: 6px;
+}
+
+.quiz-cta-btn {
+  display: inline-block;
+  margin-top: 0.75rem;
+  background: #0057a8;
+  color: #fff;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.quiz-cta-btn:hover {
+  background: #003f7a;
+}
