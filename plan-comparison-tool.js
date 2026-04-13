@@ -91,24 +91,31 @@ document.addEventListener('DOMContentLoaded', function () {
     `;
   }
 
-  // ─── Problem 1: Interactive comparison tool (static page) ───────────────────
+  // ─── Detect mode: auto-render (CMS pages) vs interactive (static page) ───────
   const interactiveContainer = document.getElementById('plan-comparison-tool');
-  if (interactiveContainer) {
+  const presetWrapper = document.querySelector('[data-plan-1]');
+  const slug1 = presetWrapper ? (presetWrapper.getAttribute('data-plan-1') || '') : '';
+  const slug2 = presetWrapper ? (presetWrapper.getAttribute('data-plan-2') || '') : '';
+  const isAutoMode = !!(slug1 && slug2);
+
+  // ─── Problem 2: Auto-render on CMS comparison pages (data-plan-1 present) ───
+  if (isAutoMode && interactiveContainer) {
     fetchPlans().then(plans => {
-      // Check if page has pre-set plan slugs via data attributes on any ancestor
-      const presetWrapper = document.querySelector('[data-plan-1]');
-      if (presetWrapper) {
-        const slug1 = presetWrapper.dataset.plan1;
-        const slug2 = presetWrapper.dataset.plan2;
-        if (slug1 && slug2) {
-          const plan1 = plans.find(p => p.slug === slug1);
-          const plan2 = plans.find(p => p.slug === slug2);
-          if (plan1 && plan2) {
-            renderComparison(plan1, plan2, interactiveContainer);
-            return;
-          }
-        }
+      const plan1 = plans.find(p => p.slug === slug1);
+      const plan2 = plans.find(p => p.slug === slug2);
+      if (plan1 && plan2) {
+        renderComparison(plan1, plan2, interactiveContainer);
+      } else {
+        interactiveContainer.innerHTML = '<p style="color:#888">Plan data not found for this comparison.</p>';
+        console.warn('RSA: Could not find plans:', slug1, slug2);
       }
+    });
+  }
+
+  // ─── Problem 1: Interactive comparison tool (static page) ───────────────────
+  if (!isAutoMode && interactiveContainer) {
+    fetchPlans().then(plans => {
+      // (no preset — show interactive state/plan selectors)
       // Extract unique states
       const states = [...new Set(plans.map(p => p.state))].filter(Boolean).sort();
 
@@ -167,32 +174,6 @@ document.addEventListener('DOMContentLoaded', function () {
         if (plan1 && plan2) renderComparison(plan1, plan2, resultDiv);
       });
     });
-  }
-
-  // ─── Problem 2: Auto-render on CMS comparison pages ─────────────────────────
-  const cmsWrapper = document.querySelector('[data-plan-1]');
-  if (cmsWrapper) {
-    const slug1 = cmsWrapper.dataset.plan1;
-    const slug2 = cmsWrapper.dataset.plan2;
-    if (slug1 && slug2) {
-      // Find or create result container
-      let resultDiv = document.getElementById('comp-cms-result');
-      if (!resultDiv) {
-        resultDiv = document.createElement('div');
-        resultDiv.id = 'comp-cms-result';
-        cmsWrapper.parentNode.insertBefore(resultDiv, cmsWrapper.nextSibling);
-      }
-      fetchPlans().then(plans => {
-        const plan1 = plans.find(p => p.slug === slug1);
-        const plan2 = plans.find(p => p.slug === slug2);
-        if (plan1 && plan2) {
-          renderComparison(plan1, plan2, resultDiv);
-        } else {
-          resultDiv.innerHTML = '<p>Plan data not available. Please check back later.</p>';
-          console.warn('RSA: Could not find plans:', slug1, slug2);
-        }
-      });
-    }
   }
 
 });
