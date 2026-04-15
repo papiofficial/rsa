@@ -1403,6 +1403,166 @@
 })();
   };
 
+  CALCULATORS['m3p-calculator'] = function(container) {
+    (function () {
+  const container = document.getElementById("m3p-calculator");
+  if (!container) return;
+
+  const MONTHS = [
+    "", "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+
+  let monthOptions = "";
+  for (let m = 1; m <= 12; m++) {
+    const selected = m === currentMonth ? " selected" : "";
+    monthOptions += `<option value="${m}"${selected}>${MONTHS[m]}</option>`;
+  }
+
+  container.innerHTML = `
+    <div class="calc-wrap">
+      <p class="calc-desc">
+        The Medicare Prescription Payment Plan (M3P) lets you spread your Part D
+        out-of-pocket drug costs evenly over the year instead of paying large bills
+        at once. For 2026, the Part D OOP cap is <strong>$2,100</strong>. Use this
+        calculator to see what your monthly payment would look like if you enrolled.
+      </p>
+
+      <div class="calc-fields">
+        <label for="m3p-drug-cost">Estimated monthly drug cost (your OOP share, $)</label>
+        <input type="number" id="m3p-drug-cost" min="1" max="2100" step="0.01" placeholder="e.g. 350" />
+        <small>Enter what you actually pay out of pocket each month \u2014 copays, coinsurance, and deductibles. Not what the plan pays.</small>
+
+        <label for="m3p-ss-income">Monthly Social Security income ($)</label>
+        <input type="number" id="m3p-ss-income" min="0" step="1" placeholder="e.g. 1800" />
+        <small>Used to show your estimated disposable income after each M3P payment.</small>
+
+        <label for="m3p-birthday">Day of birth (1\u201331)</label>
+        <input type="number" id="m3p-birthday" min="1" max="31" placeholder="e.g. 15" />
+        <small>Determines which Wednesday your Social Security check arrives \u2014 helps you line up payment timing.</small>
+
+        <label for="m3p-start-month">Month you plan to enroll in M3P</label>
+        <select id="m3p-start-month">${monthOptions}</select>
+        <small>Payments are spread from your enrollment month through December. Enrolling earlier = lower monthly payments.</small>
+      </div>
+
+      <button id="m3p-calculate">Calculate My Payment Schedule</button>
+
+      <div id="m3p-result" class="calc-result" style="display:none;">
+        <h3>Your Estimated M3P Payment Schedule</h3>
+        <div id="m3p-summary"></div>
+        <div id="m3p-table-wrap"></div>
+        <p class="calc-disclaimer">
+          This estimate is based on the 2026 Part D OOP cap of $2,100 and the CMS
+          M3P formula: <em>(Previous Balance + New OOP Costs) / Remaining Months</em>.
+          Actual payments depend on your specific plan, drug costs, and enrollment
+          timing. Contact a licensed Medicare agent or your plan for exact figures.
+          M3P enrollment opens at the start of each plan year and at certain other
+          times \u2014 ask your agent about your eligibility window.
+        </p>
+      </div>
+    </div>
+  `;
+
+  function getSSCheckTiming(birthDay) {
+    if (birthDay <= 10) return "2nd Wednesday";
+    if (birthDay <= 20) return "3rd Wednesday";
+    return "4th Wednesday";
+  }
+
+  function calculateM3P(monthlyDrugCost, monthlySSIncome, birthDay, startMonth) {
+    const ANNUAL_OOP_CAP = 2100;
+    const ssCheckTiming = getSSCheckTiming(birthDay);
+    let balance = 0;
+    let totalPaidYTD = 0;
+    const schedule = [];
+
+    for (let m = startMonth; m <= 12; m++) {
+      const monthsLeft = 13 - m;
+      const newOOP = Math.min(monthlyDrugCost, ANNUAL_OOP_CAP - totalPaidYTD);
+      if (newOOP <= 0) break;
+
+      const monthlyPayment = (balance + newOOP) / monthsLeft;
+      balance = (balance + newOOP) - monthlyPayment;
+      totalPaidYTD += monthlyPayment;
+
+      schedule.push({
+        month: MONTHS[m],
+        newOOP: newOOP.toFixed(2),
+        m3pPayment: monthlyPayment.toFixed(2),
+        totalPaid: totalPaidYTD.toFixed(2),
+        ssDate: ssCheckTiming,
+        disposableIncome: (monthlySSIncome - monthlyPayment).toFixed(2)
+      });
+    }
+    return schedule;
+  }
+
+  document.getElementById("m3p-calculate").addEventListener("click", function () {
+    const drugCost = parseFloat(document.getElementById("m3p-drug-cost").value);
+    const ssIncome = parseFloat(document.getElementById("m3p-ss-income").value);
+    const birthday = parseInt(document.getElementById("m3p-birthday").value, 10);
+    const startMonth = parseInt(document.getElementById("m3p-start-month").value, 10);
+
+    if (!drugCost || drugCost <= 0) { alert("Please enter your estimated monthly drug cost."); return; }
+    if (isNaN(ssIncome) || ssIncome < 0) { alert("Please enter your monthly Social Security income (enter 0 if none)."); return; }
+    if (!birthday || birthday < 1 || birthday > 31) { alert("Please enter a valid day of birth (1\u201331)."); return; }
+
+    const schedule = calculateM3P(drugCost, ssIncome, birthday, startMonth);
+    const resultDiv = document.getElementById("m3p-result");
+    const summaryDiv = document.getElementById("m3p-summary");
+    const tableWrap = document.getElementById("m3p-table-wrap");
+
+    const withM3P = schedule.length > 0 ? parseFloat(schedule[0].m3pPayment) : 0;
+    const savings = drugCost - withM3P;
+    const ssCheckLabel = getSSCheckTiming(birthday);
+
+    summaryDiv.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+        <div style="flex:1;min-width:150px;padding:1rem;background:#fff;border:1.5px solid #dde6f0;border-radius:8px;text-align:center;">
+          <div style="font-size:0.8rem;color:#666;margin-bottom:0.25rem;">Without M3P (first month)</div>
+          <div style="font-size:1.5rem;font-weight:700;color:#b00020;">$${drugCost.toFixed(2)}</div>
+        </div>
+        <div style="flex:1;min-width:150px;padding:1rem;background:#fff;border:1.5px solid #dde6f0;border-radius:8px;text-align:center;">
+          <div style="font-size:0.8rem;color:#666;margin-bottom:0.25rem;">With M3P (first month)</div>
+          <div style="font-size:1.5rem;font-weight:700;color:#1a7a3c;">$${withM3P.toFixed(2)}</div>
+        </div>
+        <div style="flex:1;min-width:150px;padding:1rem;background:#fff;border:1.5px solid #dde6f0;border-radius:8px;text-align:center;">
+          <div style="font-size:0.8rem;color:#666;margin-bottom:0.25rem;">Monthly savings (first month)</div>
+          <div style="font-size:1.5rem;font-weight:700;color:#0057a8;">$${savings.toFixed(2)}</div>
+        </div>
+      </div>
+      <p style="margin-bottom:1rem;font-size:0.9rem;color:#444;">
+        Your Social Security check arrives on the <strong>${ssCheckLabel}</strong> of each month
+        (based on your birth date). Your first M3P payment would be <strong>$${withM3P.toFixed(2)}</strong>,
+        leaving you approximately <strong>$${(ssIncome - withM3P).toFixed(2)}</strong> after drug costs.
+      </p>
+    `;
+
+    let rows = "";
+    schedule.forEach(function(row) {
+      const dispColor = parseFloat(row.disposableIncome) < 0 ? 'style="color:#b00020;"' : 'style="color:#1a7a3c;"';
+      rows += `<tr><td>${row.month}</td><td>$${row.newOOP}</td><td><strong>$${row.m3pPayment}</strong></td><td>$${row.totalPaid}</td><td>${row.ssDate}</td><td ${dispColor}>$${row.disposableIncome}</td></tr>`;
+    });
+
+    tableWrap.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table class="calc-table">
+          <thead><tr><th>Month</th><th>New OOP Costs</th><th>M3P Payment</th><th>Total Paid YTD</th><th>SS Check Arrives</th><th>Disposable Income</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+
+    resultDiv.style.display = "block";
+    resultDiv.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+})();
+  };
+
   CALCULATORS['signup-quiz'] = function(container) {
     /**
  * "When Should I Sign Up for Medicare?" Decision Quiz
@@ -1654,6 +1814,9 @@
     'part-d-penalty': 'partd-calculator',
     'special-enrollment-period': 'sep-finder',
     'when-should-i-sign-up-for-medicare': 'signup-quiz',
+    'm3p-payment-smoothing': 'm3p-calculator',
+    'm3p-calculator': 'm3p-calculator',
+    'medicare-prescription-payment-plan-m3p-calculator': 'm3p-calculator',
   };
 
   // Detect current page from URL slug
