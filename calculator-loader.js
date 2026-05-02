@@ -1801,6 +1801,1379 @@
 })();
   };
 
+  /* ─────────────────────────────────────────────────────────────────────────
+   * Helper: shared quiz engine (avoids duplicating logic across tools)
+   * ───────────────────────────────────────────────────────────────────────── */
+  function buildQuiz(container, steps, outcomes, introText) {
+    var stepMap = {};
+    steps.forEach(function (s) { stepMap[s.id] = s; });
+    var history = [];
+
+    function render(stepId) {
+      var step = stepMap[stepId];
+      if (!step) return;
+      history.push(stepId);
+
+      var html = '<p class="quiz-question"><strong>' + step.question + '</strong></p>';
+      html += '<div class="quiz-options">';
+      step.options.forEach(function (opt, i) {
+        html += '<button class="quiz-btn" data-index="' + i + '">' + opt.label + '</button>';
+      });
+      html += '</div>';
+      if (history.length > 1) {
+        html += '<button class="quiz-back">\u2190 Back</button>';
+      }
+      container.innerHTML = html;
+
+      container.querySelectorAll('.quiz-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var opt = step.options[parseInt(this.dataset.index)];
+          if (opt.outcome) {
+            showOutcome(opt.outcome);
+          } else if (opt.next) {
+            render(opt.next);
+          } else if (opt.answer) {
+            showAnswer(opt.answer, opt.cta);
+          }
+        });
+      });
+
+      var back = container.querySelector('.quiz-back');
+      if (back) {
+        back.addEventListener('click', function () {
+          history.pop();
+          var prev = history.pop();
+          render(prev);
+        });
+      }
+    }
+
+    function showOutcome(key) {
+      var o = outcomes[key];
+      showAnswer(
+        '<h3 class="' + (o.urgent ? 'calc-urgent' : '') + '">' + o.title + '</h3><p>' + o.body + '</p>',
+        o.cta
+      );
+    }
+
+    function showAnswer(html, showCta) {
+      var out = '<div class="quiz-result">' + html;
+      if (showCta) {
+        out += '<div class="quiz-cta"><p>Have questions about your specific situation? ' +
+          'A licensed Medicare agent can review your options at no cost to you.</p>' +
+          '<a href="/contact" class="quiz-cta-btn">Get a Free Consultation</a></div>';
+      }
+      out += '<button class="quiz-back quiz-restart">\u2190 Start Over</button></div>';
+      container.innerHTML = out;
+      container.querySelector('.quiz-restart').addEventListener('click', function () {
+        history = [];
+        render(steps[0].id);
+      });
+    }
+
+    // init
+    container.innerHTML = introText || '';
+    render(steps[0].id);
+  }
+
+  /* =========================================================================
+   * 1. MEDIGAP FIT ASSESSMENT
+   * ========================================================================= */
+  
+
+  function initMedigapFit(container) {
+    if (!container) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'calc-wrap';
+    wrap.innerHTML = '<p class="calc-desc">Medigap (Medicare Supplement) plans cover the gaps Original Medicare leaves behind, but they are not the right fit for everyone. Answer a few questions to see whether Medigap makes sense for your situation.</p>';
+    container.appendChild(wrap);
+
+    var outcomes = {
+      good_fit: {
+        title: 'Medigap may be a strong fit for you.',
+        body: 'Based on your answers, you have characteristics that often make Medigap a good choice: predictable monthly costs, freedom to see any Medicare-accepting doctor without referrals, and protection against large unexpected bills. Plan G is the most comprehensive option available to new Medicare enrollees. Your monthly Medigap premium will depend on your age, gender, location, and tobacco use. A licensed agent can pull quotes from multiple carriers in your area.',
+        cta: true
+      },
+      maybe_fit: {
+        title: 'Medigap is worth comparing, but Medicare Advantage may also work for you.',
+        body: 'Your situation does not point strongly in either direction. Medigap gives you cost predictability and broad provider access. Medicare Advantage typically has lower monthly premiums but involves networks, referrals, and variable cost-sharing. The Medicare Advantage vs Medigap Cost Calculator on this site can show you a side-by-side cost estimate based on how much healthcare you actually use.',
+        cta: true
+      },
+      poor_fit_low_income: {
+        title: 'Medigap may not be the right fit right now.',
+        body: 'Medigap premiums can be $100 to $250 per month depending on where you live and the plan you choose. If that does not fit your budget, Medicare Advantage plans often have $0 or low monthly premiums. You may also qualify for a Medicare Savings Program that helps cover Part B costs, which would free up room in your budget. Use the Medicare Savings Program Calculator on this site to check eligibility.',
+        cta: true
+      },
+      poor_fit_advantage: {
+        title: 'You may be better served by Medicare Advantage.',
+        body: 'If you are generally healthy and focused on keeping monthly costs low, Medicare Advantage often makes financial sense. You get additional benefits like dental and vision, and your annual out-of-pocket maximum protects you against catastrophic costs. The trade-off is that you work within a network. If you ever want to switch to Medigap later, be aware that you may need to go through medical underwriting, so plan ahead.',
+        cta: true
+      },
+      window_open: {
+        title: 'You are in your Medigap Open Enrollment window right now.',
+        body: 'This is the most important window of your Medicare journey for Medigap. During your six-month open enrollment period (which starts when Part B begins), insurers must accept your application regardless of health conditions. You cannot be charged more or denied based on pre-existing conditions. Once this window closes, medical underwriting applies. If Medigap is on your radar at all, this is the time to compare and apply.',
+        cta: true
+      }
+    };
+
+    var steps = [
+      {
+        id: 'q1',
+        question: 'Where are you in your Medicare journey?',
+        options: [
+          { label: 'I am new to Medicare (Part B just started or starts soon)', next: 'q_window' },
+          { label: 'I have been on Medicare for a while', next: 'q_health' },
+          { label: 'I am not on Medicare yet but planning ahead', next: 'q_health' }
+        ]
+      },
+      {
+        id: 'q_window',
+        question: 'Did your Part B coverage start within the last 6 months?',
+        options: [
+          { label: 'Yes — Part B started recently', outcome: 'window_open' },
+          { label: 'No — it has been more than 6 months', next: 'q_health' }
+        ]
+      },
+      {
+        id: 'q_health',
+        question: 'How would you describe your overall health?',
+        options: [
+          { label: 'I have ongoing health conditions and see specialists regularly', next: 'q_budget' },
+          { label: 'Generally healthy, occasional doctor visits', next: 'q_budget' },
+          { label: 'Very healthy, rarely see a doctor', next: 'q_budget' }
+        ]
+      },
+      {
+        id: 'q_budget',
+        question: 'How do you feel about a fixed monthly Medigap premium of roughly $120 to $220 per month?',
+        options: [
+          { label: 'That is manageable for me', next: 'q_travel' },
+          { label: 'It is tight but possible', next: 'q_travel' },
+          { label: 'That does not fit my budget', outcome: 'poor_fit_low_income' }
+        ]
+      },
+      {
+        id: 'q_travel',
+        question: 'Do you travel frequently or split time between states?',
+        options: [
+          { label: 'Yes — I travel a lot or live in two places', outcome: 'good_fit' },
+          { label: 'No — I stay in one area', next: 'q_providers' }
+        ]
+      },
+      {
+        id: 'q_providers',
+        question: 'How important is it to see any doctor or specialist without a referral?',
+        options: [
+          { label: 'Very important — I want total provider freedom', outcome: 'good_fit' },
+          { label: 'Somewhat important', outcome: 'maybe_fit' },
+          { label: 'Not a priority — I am fine with a network', outcome: 'poor_fit_advantage' }
+        ]
+      }
+    ];
+
+    buildQuiz(wrap, steps, outcomes, '');
+  }
+
+  /* =========================================================================
+   * 2. EMPLOYER COVERAGE VS MEDICARE COMPARISON
+   * ========================================================================= */
+  function initEmployerComparison(container) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Still covered by an employer health plan? This tool helps you compare whether to
+          keep that coverage, drop it for Medicare, or coordinate both — based on your
+          specific situation.
+        </p>
+        <div class="calc-fields">
+          <label>How old are you?</label>
+          <select id="ec-age">
+            <option value="under65">Under 65</option>
+            <option value="65">65</option>
+            <option value="over65">Over 65</option>
+          </select>
+
+          <label>How many employees does the company have?</label>
+          <select id="ec-size">
+            <option value="large">20 or more employees</option>
+            <option value="small">Fewer than 20 employees</option>
+            <option value="unsure">Not sure</option>
+          </select>
+
+          <label>Whose job provides the coverage?</label>
+          <select id="ec-source">
+            <option value="mine">My own active employment</option>
+            <option value="spouse">My spouse's active employment</option>
+            <option value="retired">Retiree coverage from a former employer</option>
+          </select>
+
+          <label>Are you currently enrolled in Medicare?</label>
+          <select id="ec-enrolled">
+            <option value="no">No</option>
+            <option value="part_a">Part A only</option>
+            <option value="both">Part A and Part B</option>
+          </select>
+
+          <label>Are you contributing to an HSA?</label>
+          <select id="ec-hsa">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+
+          <label>Estimated monthly employer plan premium (your share)</label>
+          <input type="number" id="ec-premium" placeholder="e.g. 350" min="0" max="3000">
+          <small>Your out-of-pocket monthly cost, not what your employer pays</small>
+
+          <label>Estimated annual deductible on employer plan</label>
+          <input type="number" id="ec-deductible" placeholder="e.g. 1500" min="0" max="15000">
+        </div>
+        <button id="ec-calculate">Compare My Options</button>
+        <div id="ec-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    document.getElementById('ec-calculate').addEventListener('click', function () {
+      var age = document.getElementById('ec-age').value;
+      var size = document.getElementById('ec-size').value;
+      var source = document.getElementById('ec-source').value;
+      var enrolled = document.getElementById('ec-enrolled').value;
+      var hsa = document.getElementById('ec-hsa').value;
+      var premiumRaw = parseFloat(document.getElementById('ec-premium').value) || 0;
+      var deductible = parseFloat(document.getElementById('ec-deductible').value) || 0;
+
+      var result = document.getElementById('ec-result');
+      result.style.display = 'block';
+
+      // Medicare Part B 2025 standard premium
+      var partBPremium = 185;
+      var annualPartB = partBPremium * 12;
+      var annualEmployer = premiumRaw * 12;
+
+      var situation = [];
+      var recommendation = [];
+      var warnings = [];
+
+      // Small employer — Medicare is primary
+      if (size === 'small' && (age === '65' || age === 'over65')) {
+        warnings.push('<strong class="calc-urgent">⚠ Critical: Small employer alert.</strong> If your employer has fewer than 20 employees, Medicare is your primary insurer at 65. Your employer plan pays secondary. If you are not enrolled in Medicare, your employer plan may pay as if Medicare were in place — leaving you responsible for what Medicare would have covered. Enroll in Part B now.');
+      }
+
+      // Retiree coverage
+      if (source === 'retired') {
+        situation.push('Retiree coverage is <strong>not</strong> considered active employer coverage for Medicare delay purposes. You should enroll in Medicare during your Initial Enrollment Period or a Special Enrollment Period. Retiree coverage typically works alongside Medicare, not instead of it.');
+      }
+
+      // Active large employer — can delay
+      if (size === 'large' && (source === 'mine' || source === 'spouse') && enrolled === 'no') {
+        situation.push('Your employer plan from an active large employer qualifies you to delay Medicare Part B without a late enrollment penalty. You can keep your employer coverage as primary and enroll in Medicare when employment or coverage ends.');
+        recommendation.push('You generally do not need to enroll in Part B right now. Consider enrolling in Part A if it is free (most people qualify), since it costs nothing and provides a backup layer for hospital coverage.');
+      }
+
+      // HSA warning
+      if (hsa === 'yes' && (enrolled === 'part_a' || enrolled === 'both')) {
+        warnings.push('<strong class="calc-urgent">⚠ HSA conflict.</strong> You are enrolled in Medicare and still contributing to an HSA. This is not allowed. Contributions made after your Medicare enrollment date are excess contributions subject to a 6% IRS penalty. Stop contributions and consult a tax advisor.');
+      }
+
+      if (hsa === 'yes' && enrolled === 'no' && (age === '65' || age === 'over65')) {
+        situation.push('You are contributing to an HSA. When you eventually enroll in Medicare Part A, your HSA contributions must stop. Stop contributing at least 6 months before your planned Medicare start date to avoid the retroactive coverage trap.');
+      }
+
+      // Cost comparison
+      var html = '<h3>Employer Plan vs Medicare: Your Comparison</h3>';
+
+      html += '<table class="calc-table">';
+      html += '<tr><th>Coverage</th><th>Annual Premium Cost</th><th>Deductible</th></tr>';
+      html += '<tr><td>Your employer plan</td><td>$' + annualEmployer.toLocaleString() + '/yr</td><td>$' + deductible.toLocaleString() + '</td></tr>';
+      html += '<tr><td>Medicare Part B alone</td><td>$' + annualPartB.toLocaleString() + '/yr</td><td>$257 (Part B deductible)</td></tr>';
+      html += '<tr><td>Medicare Part B + Plan G Medigap (est.)</td><td>~$' + (annualPartB + 1800).toLocaleString() + '/yr</td><td>$257 only</td></tr>';
+      html += '<tr><td>Medicare Part B + Medicare Advantage (est.)</td><td>~$' + annualPartB.toLocaleString() + '–$' + (annualPartB + 600).toLocaleString() + '/yr</td><td>Varies by plan</td></tr>';
+      html += '</table>';
+
+      if (warnings.length > 0) {
+        html += '<h4 class="calc-urgent">Action Required</h4>';
+        warnings.forEach(function (w) { html += '<p>' + w + '</p>'; });
+      }
+
+      if (situation.length > 0) {
+        html += '<h4>Your Situation</h4>';
+        situation.forEach(function (s) { html += '<p>' + s + '</p>'; });
+      }
+
+      if (recommendation.length > 0) {
+        html += '<h4>Recommendation</h4>';
+        recommendation.forEach(function (r) { html += '<p>' + r + '</p>'; });
+      }
+
+      html += '<div class="quiz-cta"><p>Want a side-by-side comparison with real plan options in your area? A licensed Medicare agent can pull actual quotes at no cost to you.</p><a href="/contact" class="quiz-cta-btn">Get a Free Comparison</a></div>';
+
+      html += '<p class="calc-disclaimer">This is a general educational comparison. Medicare coordination with employer plans involves specific rules that vary by employer size, plan type, and your situation. Verify your employer\'s coverage rules with your HR department and consult a licensed Medicare agent before making changes.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * 3. MEDICARE COST SCENARIO PLANNER
+   * ========================================================================= */
+  function initCostScenarioPlanner(container) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Medicare costs vary a lot depending on how much healthcare you use. This tool
+          runs three scenarios — a light year, a typical year, and a heavy year — so you
+          can see what your estimated annual Medicare costs would look like under each plan
+          type before you commit to one.
+        </p>
+        <div class="calc-fields">
+          <label>Which plan type are you evaluating?</label>
+          <select id="csp-plan">
+            <option value="ma">Medicare Advantage ($0 premium plan)</option>
+            <option value="ma_premium">Medicare Advantage (premium plan ~$50/mo)</option>
+            <option value="medigap_g">Original Medicare + Medigap Plan G</option>
+            <option value="medigap_n">Original Medicare + Medigap Plan N</option>
+          </select>
+
+          <label>Estimated monthly Medigap premium (if applicable)</label>
+          <input type="number" id="csp-medigap-premium" placeholder="e.g. 165" min="0" max="500">
+          <small>Leave blank if you selected a Medicare Advantage plan above</small>
+
+          <label>Do you take regular prescription medications?</label>
+          <select id="csp-rx">
+            <option value="none">No or very few (generics only)</option>
+            <option value="moderate">A few brand-name drugs</option>
+            <option value="high">Multiple brand-name or specialty drugs</option>
+          </select>
+        </div>
+        <button id="csp-calculate">Run My Cost Scenarios</button>
+        <div id="csp-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    document.getElementById('csp-calculate').addEventListener('click', function () {
+      var plan = document.getElementById('csp-plan').value;
+      var medigapPremiumInput = parseFloat(document.getElementById('csp-medigap-premium').value) || 0;
+      var rx = document.getElementById('csp-rx').value;
+
+      var result = document.getElementById('csp-result');
+      result.style.display = 'block';
+
+      var partB = 185 * 12; // $2,220/yr
+      var partBDeductible = 257;
+
+      // RX addon estimate for Part D
+      var rxCostLight = { none: 120, moderate: 480, high: 1200 }[rx];
+      var rxCostTypical = { none: 240, moderate: 960, high: 2400 }[rx];
+      var rxCostHeavy = { none: 360, moderate: 1800, high: 4200 }[rx];
+
+      var scenarios = {};
+
+      if (plan === 'ma' || plan === 'ma_premium') {
+        var maPremiumMonthly = plan === 'ma_premium' ? 50 : 0;
+        var maPremiumAnnual = maPremiumMonthly * 12;
+        // MA: copays per use case
+        scenarios.light = partB + maPremiumAnnual + 400 + rxCostLight;   // few copays
+        scenarios.typical = partB + maPremiumAnnual + 1800 + rxCostTypical; // moderate use
+        scenarios.heavy = partB + maPremiumAnnual + 5500 + rxCostHeavy;   // near MOOP
+        scenarios.moop = 'In-network MOOP typically $4,000–$7,000 (plan-specific)';
+        scenarios.note = 'Medicare Advantage copays vary significantly by plan. These estimates use common in-network copay structures. Always check your specific plan\'s Summary of Benefits.';
+      } else {
+        // Medigap
+        var mgPremium = (medigapPremiumInput || (plan === 'medigap_g' ? 165 : 130)) * 12;
+        var planNCoinsurance = plan === 'medigap_n' ? 20 : 0; // Plan N has $20 office visit copay
+        scenarios.light = partB + mgPremium + partBDeductible + rxCostLight + (planNCoinsurance * 4);
+        scenarios.typical = partB + mgPremium + partBDeductible + rxCostTypical + (planNCoinsurance * 12);
+        scenarios.heavy = partB + mgPremium + partBDeductible + rxCostHeavy + (planNCoinsurance * 24);
+        scenarios.moop = 'No MOOP cap — but Medigap covers most cost-sharing, so real exposure is minimal';
+        scenarios.note = plan === 'medigap_n'
+          ? 'Plan N includes a $20 copay for office visits and $50 for ER visits that do not result in admission. Everything else (hospital, specialist, procedures) is covered after the Part B deductible.'
+          : 'Plan G covers all cost-sharing after the annual Part B deductible of $257. No copays, no coinsurance, no network restrictions.';
+      }
+
+      var html = '<h3>Your Cost Scenarios</h3>';
+      html += '<table class="calc-table">';
+      html += '<tr><th>Scenario</th><th>Est. Annual Cost</th><th>What this assumes</th></tr>';
+      html += '<tr><td><strong>Light year</strong></td><td>$' + Math.round(scenarios.light).toLocaleString() + '</td><td>A few routine visits, no major procedures</td></tr>';
+      html += '<tr><td><strong>Typical year</strong></td><td>$' + Math.round(scenarios.typical).toLocaleString() + '</td><td>Regular visits, one specialist, basic labs</td></tr>';
+      html += '<tr class="calc-total"><td><strong>Heavy year</strong></td><td>$' + Math.round(scenarios.heavy).toLocaleString() + '</td><td>Surgery, hospitalization, or serious illness</td></tr>';
+      html += '</table>';
+
+      html += '<p><strong>Out-of-pocket maximum:</strong> ' + scenarios.moop + '</p>';
+      html += '<p><em>' + scenarios.note + '</em></p>';
+
+      html += '<h4>What this means for you</h4>';
+      var diff = scenarios.heavy - scenarios.light;
+      html += '<p>The spread between your lightest and heaviest year is <strong>$' + Math.round(diff).toLocaleString() + '</strong>. ';
+      if (plan.startsWith('ma')) {
+        html += 'Medicare Advantage keeps your low-use years affordable, but a serious health event in a given year can bring costs close to your plan\'s out-of-pocket maximum. Knowing that number before you enroll matters.';
+      } else {
+        html += 'Medigap keeps your costs predictable across all three scenarios. Your biggest variable is prescription drug spending, which depends on your specific medications and the Part D plan you pair with your Medigap coverage.';
+      }
+      html += '</p>';
+
+      html += '<div class="quiz-cta"><p>Want to run this comparison with actual plans available in your zip code? A licensed Medicare agent can pull real quotes at no cost.</p><a href="/contact" class="quiz-cta-btn">Get Real Plan Quotes</a></div>';
+      html += '<p class="calc-disclaimer">Cost estimates are for general educational purposes based on 2025 Medicare figures. Actual costs depend on your specific plan, location, and healthcare usage. Prescription drug costs vary significantly by medication and plan formulary.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * 4. LATE ENROLLMENT PENALTY CHECKER
+   * ========================================================================= */
+  function initLatePenaltyChecker(container) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Missing Medicare enrollment deadlines can result in permanent monthly penalties
+          on your Part B and Part D premiums. This tool checks whether you are at risk
+          for a penalty, estimates what you might owe, and tells you what to do next.
+        </p>
+        <div class="calc-fields">
+          <label>Which penalty are you checking?</label>
+          <select id="lp-type">
+            <option value="both">Check both Part B and Part D</option>
+            <option value="partb">Part B only</option>
+            <option value="partd">Part D only</option>
+          </select>
+
+          <label>When did you turn 65? (or become Medicare-eligible)</label>
+          <input type="month" id="lp-eligible" max="2030-12">
+          <small>If eligible through disability, use the month your Medicare began</small>
+
+          <label>When did you (or do you plan to) enroll in Part B?</label>
+          <input type="month" id="lp-partb-enroll" max="2030-12">
+          <small>Leave blank if you have not enrolled yet</small>
+
+          <label>Did you have qualifying employer health coverage after 65?</label>
+          <select id="lp-employer">
+            <option value="no">No</option>
+            <option value="yes_large">Yes — employer had 20 or more employees</option>
+            <option value="yes_small">Yes — employer had fewer than 20 employees</option>
+          </select>
+
+          <label>If you had employer coverage, when did it end?</label>
+          <input type="month" id="lp-employer-end" max="2030-12">
+          <small>Leave blank if still active or not applicable</small>
+
+          <label>When did you (or do you plan to) enroll in Part D?</label>
+          <input type="month" id="lp-partd-enroll" max="2030-12">
+          <small>Leave blank if not enrolled yet</small>
+
+          <label>Did you have creditable drug coverage after becoming eligible?</label>
+          <select id="lp-creditable">
+            <option value="no">No</option>
+            <option value="yes">Yes — employer plan, VA, TRICARE, or other qualifying coverage</option>
+            <option value="unsure">Not sure</option>
+          </select>
+        </div>
+        <button id="lp-calculate">Check My Penalty Risk</button>
+        <div id="lp-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    document.getElementById('lp-calculate').addEventListener('click', function () {
+      var type = document.getElementById('lp-type').value;
+      var eligibleStr = document.getElementById('lp-eligible').value;
+      var partBStr = document.getElementById('lp-partb-enroll').value;
+      var employer = document.getElementById('lp-employer').value;
+      var employerEndStr = document.getElementById('lp-employer-end').value;
+      var partDStr = document.getElementById('lp-partd-enroll').value;
+      var creditable = document.getElementById('lp-creditable').value;
+
+      var result = document.getElementById('lp-result');
+      result.style.display = 'block';
+
+      var partBStandard = 185;
+      var partDBase = 36.78; // 2025 national base beneficiary premium
+
+      function monthDiff(from, to) {
+        var f = from.split('-').map(Number);
+        var t = to.split('-').map(Number);
+        return (t[0] - f[0]) * 12 + (t[1] - f[1]);
+      }
+
+      function today() {
+        var d = new Date();
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      }
+
+      if (!eligibleStr) {
+        result.innerHTML = '<p class="calc-urgent">Please enter your Medicare eligibility date to continue.</p>';
+        return;
+      }
+
+      var html = '<h3>Your Late Enrollment Penalty Analysis</h3>';
+
+      // ── PART B ──
+      if (type === 'both' || type === 'partb') {
+        html += '<h4>Medicare Part B</h4>';
+
+        var coverageStartsB = employer === 'yes_large' && employerEndStr ? employerEndStr : eligibleStr;
+        var enrolledB = partBStr || today();
+        var gapMonthsB = Math.max(0, monthDiff(coverageStartsB, enrolledB));
+        var penaltyPeriodsB = Math.floor(gapMonthsB / 12);
+
+        if (employer === 'yes_large' && !partBStr) {
+          html += '<p class="calc-good-news">✓ You have qualifying employer coverage from a large employer. You can delay Part B without a penalty while that coverage is active. Enroll within 8 months of losing that coverage to stay penalty-free.</p>';
+        } else if (employer === 'yes_large' && employerEndStr && gapMonthsB <= 8) {
+          html += '<p class="calc-good-news">✓ You enrolled within your 8-month Special Enrollment Period after losing employer coverage. No Part B penalty applies.</p>';
+        } else if (penaltyPeriodsB === 0) {
+          html += '<p class="calc-good-news">✓ No Part B penalty detected. You enrolled within your allowable window.</p>';
+        } else {
+          var bPenaltyPct = penaltyPeriodsB * 10;
+          var bPenaltyMonthly = (partBStandard * bPenaltyPct / 100).toFixed(2);
+          var bTotalPremium = (partBStandard + parseFloat(bPenaltyMonthly)).toFixed(2);
+          html += '<table class="calc-table">';
+          html += '<tr><td>Gap period (uncovered months)</td><td>' + gapMonthsB + ' months</td></tr>';
+          html += '<tr><td>Full 12-month periods</td><td>' + penaltyPeriodsB + '</td></tr>';
+          html += '<tr><td>Penalty percentage</td><td class="calc-urgent">' + bPenaltyPct + '%</td></tr>';
+          html += '<tr><td>Monthly penalty amount</td><td class="calc-urgent">+$' + bPenaltyMonthly + '</td></tr>';
+          html += '<tr class="calc-total"><td>Your estimated Part B premium</td><td>$' + bTotalPremium + '/month</td></tr>';
+          html += '</table>';
+          html += '<p class="calc-urgent">This penalty is permanent. Over 20 years, this adds approximately $' + Math.round(parseFloat(bPenaltyMonthly) * 240).toLocaleString() + ' in extra premiums.</p>';
+        }
+      }
+
+      // ── PART D ──
+      if (type === 'both' || type === 'partd') {
+        html += '<h4>Medicare Part D</h4>';
+
+        var enrolledD = partDStr || today();
+        var gapMonthsD = Math.max(0, monthDiff(eligibleStr, enrolledD));
+
+        if (creditable === 'yes') {
+          html += '<p class="calc-good-news">✓ You had creditable drug coverage. As long as you have documentation, no Part D penalty should apply for that period.</p>';
+        } else if (creditable === 'unsure') {
+          html += '<p>⚠ You may have had creditable coverage. Check with your prior insurer — they are required to send you an annual creditable coverage notice. If you have that letter, keep it. If your coverage was not creditable, a penalty may apply.</p>';
+        } else if (gapMonthsD < 63) {
+          html += '<p class="calc-good-news">✓ Your gap is under 63 days. No Part D penalty applies.</p>';
+        } else {
+          var dPenaltyMonths = Math.floor(gapMonthsD / 1); // every full month counts
+          var dPenaltyPct = dPenaltyMonths * 0.01;
+          var dPenaltyMonthly = (dPenaltyPct * partDBase).toFixed(2);
+          html += '<table class="calc-table">';
+          html += '<tr><td>Uncovered months</td><td>' + dPenaltyMonths + '</td></tr>';
+          html += '<tr><td>Penalty percentage</td><td class="calc-urgent">' + (dPenaltyPct * 100).toFixed(0) + '%</td></tr>';
+          html += '<tr><td>Monthly penalty (based on $' + partDBase + ' base)</td><td class="calc-urgent">+$' + dPenaltyMonthly + '/month</td></tr>';
+          html += '</table>';
+          html += '<p>The Part D penalty is permanent and recalculated each year as the national base beneficiary premium changes. Your penalty amount may increase over time even if the percentage stays the same.</p>';
+        }
+      }
+
+      html += '<div class="quiz-cta"><p>If you have a penalty or think you might, a licensed Medicare agent can review your situation and explain your options.</p><a href="/contact" class="quiz-cta-btn">Talk to an Agent</a></div>';
+      html += '<p class="calc-disclaimer">Penalty calculations are estimates based on 2025 Medicare figures. Actual penalties are determined by CMS and Social Security based on your specific enrollment history. If you believe a penalty was assessed in error, you have the right to appeal.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * 5. DOCTOR AND DRUG PRESCRIPTION ASSESSMENT
+   * ========================================================================= */
+  function initDoctorDrugAssessment(container) {
+    if (!container) return;
+
+    var drugs = [];
+    var doctors = [];
+
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Before you pick a Medicare plan, it is worth checking two things: whether your
+          current doctors accept it, and whether your prescriptions are covered at a
+          reasonable cost. This tool helps you gather and organize that information before
+          you enroll or switch plans.
+        </p>
+
+        <h4>Step 1: Your Prescriptions</h4>
+        <div id="drug-list"></div>
+        <div class="calc-fields" style="flex-direction:row;align-items:flex-end;gap:0.5rem;flex-wrap:wrap;">
+          <div>
+            <label>Drug name</label>
+            <input type="text" id="drug-name" placeholder="e.g. Metformin" style="max-width:180px;">
+          </div>
+          <div>
+            <label>Dosage</label>
+            <input type="text" id="drug-dose" placeholder="e.g. 500mg" style="max-width:100px;">
+          </div>
+          <div>
+            <label>Frequency</label>
+            <select id="drug-freq" style="max-width:140px;">
+              <option value="daily">Once daily</option>
+              <option value="twice">Twice daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="asneeded">As needed</option>
+            </select>
+          </div>
+          <button id="drug-add" style="margin-top:1.25rem;">+ Add Drug</button>
+        </div>
+
+        <h4 style="margin-top:1.5rem;">Step 2: Your Doctors</h4>
+        <div id="doctor-list"></div>
+        <div class="calc-fields" style="flex-direction:row;align-items:flex-end;gap:0.5rem;flex-wrap:wrap;">
+          <div>
+            <label>Doctor name</label>
+            <input type="text" id="doc-name" placeholder="e.g. Dr. Sarah Kim" style="max-width:180px;">
+          </div>
+          <div>
+            <label>Specialty</label>
+            <input type="text" id="doc-specialty" placeholder="e.g. Cardiologist" style="max-width:150px;">
+          </div>
+          <button id="doc-add" style="margin-top:1.25rem;">+ Add Doctor</button>
+        </div>
+
+        <div style="margin-top:2rem;">
+          <button id="dda-generate">Generate My Assessment Checklist</button>
+        </div>
+        <div id="dda-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    function renderDrugs() {
+      var el = document.getElementById('drug-list');
+      if (drugs.length === 0) { el.innerHTML = '<p style="color:#888;font-size:0.9rem;">No drugs added yet.</p>'; return; }
+      el.innerHTML = '<table class="calc-table"><tr><th>Drug</th><th>Dosage</th><th>Frequency</th><th></th></tr>' +
+        drugs.map(function (d, i) {
+          return '<tr><td>' + d.name + '</td><td>' + d.dose + '</td><td>' + d.freq + '</td>' +
+            '<td><button data-i="' + i + '" class="drug-remove" style="background:none;border:none;color:#b00020;cursor:pointer;">Remove</button></td></tr>';
+        }).join('') + '</table>';
+      el.querySelectorAll('.drug-remove').forEach(function (btn) {
+        btn.addEventListener('click', function () { drugs.splice(parseInt(this.dataset.i), 1); renderDrugs(); });
+      });
+    }
+
+    function renderDoctors() {
+      var el = document.getElementById('doctor-list');
+      if (doctors.length === 0) { el.innerHTML = '<p style="color:#888;font-size:0.9rem;">No doctors added yet.</p>'; return; }
+      el.innerHTML = '<table class="calc-table"><tr><th>Doctor</th><th>Specialty</th><th></th></tr>' +
+        doctors.map(function (d, i) {
+          return '<tr><td>' + d.name + '</td><td>' + d.specialty + '</td>' +
+            '<td><button data-i="' + i + '" class="doc-remove" style="background:none;border:none;color:#b00020;cursor:pointer;">Remove</button></td></tr>';
+        }).join('') + '</table>';
+      el.querySelectorAll('.doc-remove').forEach(function (btn) {
+        btn.addEventListener('click', function () { doctors.splice(parseInt(this.dataset.i), 1); renderDoctors(); });
+      });
+    }
+
+    renderDrugs();
+    renderDoctors();
+
+    document.getElementById('drug-add').addEventListener('click', function () {
+      var name = document.getElementById('drug-name').value.trim();
+      var dose = document.getElementById('drug-dose').value.trim();
+      var freq = document.getElementById('drug-freq').value;
+      if (!name) return;
+      drugs.push({ name: name, dose: dose || '—', freq: freq });
+      document.getElementById('drug-name').value = '';
+      document.getElementById('drug-dose').value = '';
+      renderDrugs();
+    });
+
+    document.getElementById('doc-add').addEventListener('click', function () {
+      var name = document.getElementById('doc-name').value.trim();
+      var specialty = document.getElementById('doc-specialty').value.trim();
+      if (!name) return;
+      doctors.push({ name: name, specialty: specialty || 'General' });
+      document.getElementById('doc-name').value = '';
+      document.getElementById('doc-specialty').value = '';
+      renderDoctors();
+    });
+
+    document.getElementById('dda-generate').addEventListener('click', function () {
+      var result = document.getElementById('dda-result');
+      result.style.display = 'block';
+
+      var html = '<h3>Your Medicare Plan Shopping Checklist</h3>';
+      html += '<p>Use this checklist when comparing Medicare Advantage or Part D plans on <a href="https://www.medicare.gov/plan-compare" target="_blank" rel="noopener">medicare.gov/plan-compare</a>.</p>';
+
+      html += '<h4>Prescriptions to Check (' + drugs.length + ')</h4>';
+      if (drugs.length === 0) {
+        html += '<p style="color:#888;">No prescriptions entered. Add your drugs above to include them here.</p>';
+      } else {
+        html += '<table class="calc-table"><tr><th>Drug</th><th>Dosage</th><th>Frequency</th><th>What to check</th></tr>';
+        drugs.forEach(function (d) {
+          html += '<tr><td>' + d.name + '</td><td>' + d.dose + '</td><td>' + d.freq + '</td>' +
+            '<td>Formulary tier, copay, prior auth required?</td></tr>';
+        });
+        html += '</table>';
+        html += '<p><strong>Tip:</strong> On medicare.gov/plan-compare, enter your drugs exactly as listed here. The tool will show you your estimated annual drug costs for each plan.</p>';
+      }
+
+      html += '<h4>Doctors to Check (' + doctors.length + ')</h4>';
+      if (doctors.length === 0) {
+        html += '<p style="color:#888;">No doctors entered. Add your providers above to include them here.</p>';
+      } else {
+        html += '<table class="calc-table"><tr><th>Doctor</th><th>Specialty</th><th>What to verify</th></tr>';
+        doctors.forEach(function (d) {
+          html += '<tr><td>' + d.name + '</td><td>' + d.specialty + '</td>' +
+            '<td>In-network for the plan? Accepting new patients?</td></tr>';
+        });
+        html += '</table>';
+        html += '<p><strong>Tip:</strong> For Medicare Advantage, always verify directly with the doctor\'s office that they accept the specific plan, not just "Medicare." Networks change and the plan directory can lag behind.</p>';
+      }
+
+      html += '<h4>Before You Enroll: Questions to Ask Any Plan</h4>';
+      html += '<ul style="padding-left:1.25rem;line-height:1.9;">';
+      html += '<li>Are all of my doctors in-network?</li>';
+      html += '<li>Are all of my drugs on the formulary, and at what tier?</li>';
+      html += '<li>What is the annual out-of-pocket maximum?</li>';
+      html += '<li>Do any of my drugs require prior authorization or step therapy?</li>';
+      html += '<li>Is my preferred pharmacy in-network?</li>';
+      html += '<li>What is the copay or coinsurance for specialist visits?</li>';
+      html += '</ul>';
+
+      html += '<div class="quiz-cta"><p>A licensed Medicare agent can run a drug cost comparison across all plans in your area and check your doctors for you — at no cost.</p><a href="/contact" class="quiz-cta-btn">Get Help Comparing Plans</a></div>';
+      html += '<p class="calc-disclaimer">This checklist is for informational purposes only. Always verify drug coverage and provider participation directly with the plan before enrolling.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * 6. COBRA VS MEDICARE TOOL
+   * ========================================================================= */
+  function initCobraVsMedicare(container) {
+    if (!container) return;
+
+    var outcomes = {
+      enroll_medicare: {
+        title: 'Enroll in Medicare — do not rely on COBRA as your primary coverage.',
+        body: 'COBRA does not count as qualifying employer coverage for Medicare delay purposes. If you are 65 or older and on COBRA, Medicare is the coverage you should have. Failing to enroll in Part B during your Initial Enrollment Period or Special Enrollment Period will likely result in a permanent late enrollment penalty. You can keep COBRA as a supplement after enrolling in Medicare, but Medicare must come first.',
+        cta: true
+      },
+      sep_window: {
+        title: 'You have a Special Enrollment Period — act within 8 months.',
+        body: 'When active employer coverage ends, you get an 8-month window to enroll in Part B without a penalty. COBRA does not extend this window. The clock started when your job or active employer coverage ended, not when COBRA began. If more than 8 months have passed since you left your job, you may have a penalty. Enroll as soon as possible.',
+        cta: true
+      },
+      cobra_can_supplement: {
+        title: 'You can keep COBRA alongside Medicare.',
+        body: 'Once you are enrolled in Medicare, COBRA becomes secondary coverage. It can help cover Medicare cost-sharing like deductibles and copays, essentially acting like a Medigap plan while it is in effect. COBRA coverage typically lasts 18 months from the qualifying event. When it ends, you can shop for a Medigap plan — though you may need to qualify medically at that point since your Medigap open enrollment window likely passed. Plan ahead.',
+        cta: true
+      },
+      delay_ok: {
+        title: 'You can delay Medicare while on active employer coverage.',
+        body: 'If you are covered by an active employer group health plan from a company with 20 or more employees, you can delay Medicare without penalty. COBRA is not active employer coverage — but if you are still employed and covered by your own or your spouse\'s active group plan, you are in a protected delay window. When that employment ends, your 8-month Special Enrollment Period begins.',
+        cta: true
+      },
+      needs_review: {
+        title: 'Your situation needs a closer look.',
+        body: 'The interaction between COBRA and Medicare involves timing, employer size, and enrollment history that can be hard to untangle. A licensed Medicare agent or your State Health Insurance Assistance Program (SHIP) counselor can review your specific dates and help you understand your options and any penalty risk.',
+        cta: true
+      }
+    };
+
+    var steps = [
+      {
+        id: 'q1',
+        question: 'How old are you?',
+        options: [
+          { label: 'Under 65', next: 'q_under65_cobra' },
+          { label: '65 or older', next: 'q_enrolled' }
+        ]
+      },
+      {
+        id: 'q_under65_cobra',
+        question: 'Are you on COBRA right now?',
+        options: [
+          { label: 'Yes', answer: '<p>Under 65 and on COBRA: you are not yet Medicare-eligible based on age. COBRA coverage can bridge the gap until you turn 65. When you turn 65, your Medicare Initial Enrollment Period begins, and you will need to decide whether to enroll in Medicare and drop COBRA, or continue COBRA temporarily. A licensed agent can help you plan the transition before your 65th birthday.</p>', cta: true },
+          { label: 'No', answer: '<p>You are under 65 and not on COBRA. Unless you qualify for Medicare through disability or a condition like ESRD or ALS, you are not yet Medicare-eligible. Your main options are marketplace coverage, a spouse\'s employer plan, or Medicaid if you qualify.</p>' }
+        ]
+      },
+      {
+        id: 'q_enrolled',
+        question: 'Are you currently enrolled in Medicare?',
+        options: [
+          { label: 'Yes — I have Medicare', next: 'q_cobra_alongside' },
+          { label: 'No — I am not on Medicare', next: 'q_why_not' }
+        ]
+      },
+      {
+        id: 'q_cobra_alongside',
+        question: 'Are you also on COBRA right now?',
+        options: [
+          { label: 'Yes', outcome: 'cobra_can_supplement' },
+          { label: 'No — just Medicare', answer: '<p>You are enrolled in Medicare without COBRA. If you are looking to reduce your cost-sharing, you may want to consider a Medigap plan or Medicare Advantage. A licensed agent can explain your options.</p>', cta: true }
+        ]
+      },
+      {
+        id: 'q_why_not',
+        question: 'Why are you not enrolled in Medicare yet?',
+        options: [
+          { label: 'I am relying on COBRA instead of Medicare', outcome: 'enroll_medicare' },
+          { label: 'I just lost active employer coverage and am within 8 months', outcome: 'sep_window' },
+          { label: 'I am still on active employer coverage (not COBRA)', outcome: 'delay_ok' },
+          { label: 'I am not sure about my situation', outcome: 'needs_review' }
+        ]
+      }
+    ];
+
+    var wrap = document.createElement('div');
+    wrap.className = 'calc-wrap';
+    wrap.innerHTML = '<p class="calc-desc">COBRA and Medicare interact in ways that trip up a lot of people. COBRA does not replace Medicare and does not extend your enrollment window. This tool helps you figure out what you should be doing right now.</p>';
+    container.appendChild(wrap);
+    buildQuiz(wrap, steps, outcomes, '');
+  }
+
+  /* =========================================================================
+   * 7. DOCUMENT GATHERER BUILDER
+   * ========================================================================= */
+  function initDocumentGatherer(container) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Enrolling in Medicare or helping a parent navigate it involves gathering a
+          surprising number of documents. Answer a few questions and this tool will build
+          a personalized checklist of exactly what you need — and why.
+        </p>
+        <div class="calc-fields">
+          <label>Who is this checklist for?</label>
+          <select id="dg-who">
+            <option value="self">Myself — I am enrolling in Medicare</option>
+            <option value="parent">A parent or family member I am helping</option>
+          </select>
+
+          <label>What stage are you in?</label>
+          <select id="dg-stage">
+            <option value="first">Just enrolling in Medicare for the first time</option>
+            <option value="switching">Switching from one Medicare plan to another</option>
+            <option value="appeal">Filing an appeal or disputing a bill</option>
+            <option value="msp">Applying for help with costs (Medicare Savings Program)</option>
+            <option value="medigap">Applying for a Medigap (Medicare Supplement) plan</option>
+          </select>
+
+          <label>Do any of these apply?</label>
+          <select id="dg-extra">
+            <option value="none">None of the below</option>
+            <option value="employer">Currently or recently had employer health insurance</option>
+            <option value="disability">Enrolling through disability (under 65)</option>
+            <option value="immigrant">Non-citizen or limited work history in the US</option>
+            <option value="veteran">Veteran with VA benefits</option>
+          </select>
+        </div>
+        <button id="dg-generate">Build My Document Checklist</button>
+        <div id="dg-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    document.getElementById('dg-generate').addEventListener('click', function () {
+      var who = document.getElementById('dg-who').value;
+      var stage = document.getElementById('dg-stage').value;
+      var extra = document.getElementById('dg-extra').value;
+      var result = document.getElementById('dg-result');
+      result.style.display = 'block';
+
+      var pronoun = who === 'self' ? 'you' : 'them';
+      var possessive = who === 'self' ? 'your' : 'their';
+
+      var docs = [];
+
+      // Always needed
+      docs.push({ doc: 'Social Security card or number', why: 'Required for all Medicare applications and enrollment forms.' });
+      docs.push({ doc: 'Government-issued photo ID (driver\'s license or passport)', why: 'Required to verify identity for enrollment and benefit applications.' });
+      docs.push({ doc: 'Birth certificate or proof of age', why: 'Medicare eligibility is age-based. Social Security may need this if age has not already been verified.' });
+
+      if (stage === 'first' || stage === 'switching') {
+        docs.push({ doc: 'Medicare card (red, white, and blue)', why: 'Shows ' + possessive + ' Medicare number and Part A/B effective dates. Required when enrolling in Advantage or Part D plans.' });
+        docs.push({ doc: 'List of current prescriptions (name, dosage, frequency)', why: 'Needed to compare Part D plans and Medicare Advantage drug coverage on medicare.gov.' });
+        docs.push({ doc: 'List of current doctors and their NPI numbers', why: 'Needed to verify in-network status when comparing Medicare Advantage plans.' });
+      }
+
+      if (stage === 'first') {
+        docs.push({ doc: 'Social Security benefit award letter (if receiving SS)', why: 'Confirms benefit status. If receiving SS, Part A enrollment may be automatic.' });
+      }
+
+      if (stage === 'appeal') {
+        docs.push({ doc: 'Medicare Summary Notice (MSN) or Explanation of Benefits (EOB)', why: 'The MSN or EOB contains the claim details, service dates, and denial reason needed to file an appeal.' });
+        docs.push({ doc: 'Doctor\'s letter or clinical notes supporting the appeal', why: 'A written statement from ' + possessive + ' physician explaining the medical necessity of the denied service strengthens the appeal.' });
+        docs.push({ doc: 'Copy of the denial notice', why: 'The denial letter contains the appeal deadline and instructions. Appeals must typically be filed within 120 days of the date on this notice.' });
+      }
+
+      if (stage === 'msp') {
+        docs.push({ doc: 'Proof of income: Social Security award letter, pension statement, bank statements', why: 'Medicare Savings Programs have income limits. ' + (who === 'self' ? 'Your' : 'Their') + ' monthly income from all sources must be documented.' });
+        docs.push({ doc: 'Proof of assets: bank account balances, investment account statements', why: 'Most MSP programs have asset limits. Recent statements (within 3 months) are typically required.' });
+        docs.push({ doc: 'Proof of Medicare enrollment (Medicare card)', why: 'MSP eligibility requires being enrolled in Medicare Parts A and B.' });
+      }
+
+      if (stage === 'medigap') {
+        docs.push({ doc: 'Medicare card showing Part B effective date', why: 'Medigap insurers need ' + possessive + ' Part B start date to determine if ' + pronoun + ' are in open enrollment (no health questions) or need underwriting.' });
+        docs.push({ doc: 'Health history (list of diagnoses, medications, hospitalizations)', why: 'Required if applying outside open enrollment and the insurer requires medical underwriting.' });
+        if (extra === 'employer') {
+          docs.push({ doc: 'Letter of creditable coverage from prior employer plan', why: 'If ' + pronoun + ' lost employer coverage recently, this letter may trigger guaranteed issue rights for Medigap.' });
+        }
+      }
+
+      if (extra === 'employer') {
+        docs.push({ doc: 'Letter of creditable coverage from employer health plan', why: 'Needed to document that ' + pronoun + ' had qualifying coverage and can enroll in Part B or Part D without a late penalty.' });
+        docs.push({ doc: 'COBRA election notice or coverage end date letter', why: 'Documents when active employer coverage ended. This starts ' + possessive + ' 8-month Special Enrollment Period for Part B.' });
+      }
+
+      if (extra === 'disability') {
+        docs.push({ doc: 'SSDI award letter from Social Security', why: 'Documents disability status. Medicare becomes available after 24 months of SSDI. The award letter shows the benefit start date.' });
+      }
+
+      if (extra === 'immigrant') {
+        docs.push({ doc: 'Proof of lawful permanent residence or citizenship (green card, naturalization certificate)', why: 'Medicare eligibility for non-citizens requires 5 years of lawful permanent residence. This must be documented.' });
+        docs.push({ doc: 'Work history documentation (W-2s, SSA earnings record)', why: 'If work history is limited, this determines whether ' + pronoun + ' qualify for premium-free Part A or need to pay a premium.' });
+      }
+
+      if (extra === 'veteran') {
+        docs.push({ doc: 'VA benefits letter or VA card', why: 'VA coverage is creditable for Part D purposes, so ' + pronoun + ' may be able to delay Part D without a penalty while VA coverage is active.' });
+        docs.push({ doc: 'DD-214 (Certificate of Release or Discharge from Active Duty)', why: 'May be needed for certain VA-Medicare coordination situations or to establish veteran status.' });
+      }
+
+      var html = '<h3>Your Medicare Document Checklist</h3>';
+      html += '<p>' + docs.length + ' documents identified for your situation.</p>';
+      html += '<table class="calc-table"><tr><th>Document</th><th>Why you need it</th></tr>';
+      docs.forEach(function (d) {
+        html += '<tr><td><strong>' + d.doc + '</strong></td><td>' + d.why + '</td></tr>';
+      });
+      html += '</table>';
+
+      html += '<h4>Tips for Gathering These Documents</h4>';
+      html += '<ul style="padding-left:1.25rem;line-height:1.9;">';
+      html += '<li>Request a copy of your Social Security earnings record at <a href="https://ssa.gov/myaccount" target="_blank" rel="noopener">ssa.gov/myaccount</a>.</li>';
+      html += '<li>If you have lost your Medicare card, call 1-800-MEDICARE or log in to your MyMedicare account to request a replacement.</li>';
+      html += '<li>If you need a copy of a prior employer\'s creditable coverage letter, contact that plan\'s HR department directly — they are required to provide it.</li>';
+      html += '<li>Keep physical and digital copies of everything. Medicare appeals and MSP applications often require documentation that can be hard to reconstruct later.</li>';
+      html += '</ul>';
+
+      html += '<div class="quiz-cta"><p>Have all your documents and ready to enroll? A licensed Medicare agent can walk you through the process at no cost.</p><a href="/contact" class="quiz-cta-btn">Get Help Enrolling</a></div>';
+      html += '<p class="calc-disclaimer">This checklist is for general educational purposes. Required documents may vary by state, situation, and the specific office or insurer processing your application. Always confirm document requirements directly with Medicare, Social Security, or your state Medicaid office.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * 8. CAREGIVER CHECKLIST BUILDER
+   * ========================================================================= */
+  function initCaregiverChecklist(container) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Helping a parent or loved one navigate Medicare is a lot to manage. This tool
+          builds a personalized action checklist based on where your family member is in
+          the Medicare journey — so nothing falls through the cracks.
+        </p>
+        <div class="calc-fields">
+          <label>How old is your family member?</label>
+          <select id="cc-age">
+            <option value="approaching">Approaching 65 (within 12 months)</option>
+            <option value="just65">Just turned 65</option>
+            <option value="enrolled">Already enrolled in Medicare</option>
+            <option value="review">On Medicare and due for an annual review</option>
+          </select>
+
+          <label>Do they currently have health insurance?</label>
+          <select id="cc-coverage">
+            <option value="employer">Employer plan (still working)</option>
+            <option value="cobra">COBRA</option>
+            <option value="marketplace">Marketplace plan</option>
+            <option value="none">No coverage</option>
+            <option value="medicare_only">Medicare only</option>
+          </select>
+
+          <label>Do they take regular prescription medications?</label>
+          <select id="cc-rx">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+
+          <label>Do they see specialists or have chronic conditions?</label>
+          <select id="cc-health">
+            <option value="yes">Yes</option>
+            <option value="no">No — generally healthy</option>
+          </select>
+
+          <label>Are you helping with finances or have power of attorney?</label>
+          <select id="cc-poa">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+          </select>
+        </div>
+        <button id="cc-generate">Build My Caregiver Checklist</button>
+        <div id="cc-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    document.getElementById('cc-generate').addEventListener('click', function () {
+      var age = document.getElementById('cc-age').value;
+      var coverage = document.getElementById('cc-coverage').value;
+      var rx = document.getElementById('cc-rx').value;
+      var health = document.getElementById('cc-health').value;
+      var poa = document.getElementById('cc-poa').value;
+      var result = document.getElementById('cc-result');
+      result.style.display = 'block';
+
+      var items = [];
+
+      if (age === 'approaching') {
+        items.push({ priority: 'High', task: 'Confirm their Medicare eligibility date', detail: 'Medicare eligibility begins at 65. Their Initial Enrollment Period (IEP) starts 3 months before their 65th birthday. Missing this window can result in a permanent Part B penalty.' });
+        items.push({ priority: 'High', task: 'Determine whether they can delay Medicare', detail: coverage === 'employer' ? 'They have employer coverage. If the employer has 20+ employees, they can delay Part B without penalty while that coverage is active.' : 'Based on their current coverage, they should likely enroll in Medicare during their IEP to avoid penalties.' });
+        items.push({ priority: 'Medium', task: 'Research Medicare plan options in their area', detail: 'Use medicare.gov/plan-compare to view Medicare Advantage and Part D plans available at their address. Compare based on their doctors and medications.' });
+        if (coverage === 'employer') {
+          items.push({ priority: 'Medium', task: 'Get a creditable coverage letter from their employer', detail: 'This letter documents that their employer plan is creditable. They will need it to enroll in Part D penalty-free when they eventually leave employer coverage.' });
+        }
+      }
+
+      if (age === 'just65') {
+        items.push({ priority: 'High', task: 'Check their IEP window — it may be closing', detail: 'The Initial Enrollment Period is 7 months total: 3 months before, the birth month, and 3 months after. Enrollment in the last 3 months delays coverage start by 1–3 months.' });
+        items.push({ priority: 'High', task: 'Decide between Medicare Advantage and Original Medicare + Medigap', detail: 'This is the most important coverage decision they will make. Use the Medicare Advantage vs Medigap Cost Calculator on this site to compare.' });
+        if (rx === 'yes') {
+          items.push({ priority: 'High', task: 'Enroll in Part D or a Medicare Advantage plan with drug coverage', detail: 'Going without drug coverage for more than 63 days after becoming eligible will result in a permanent Part D penalty.' });
+        }
+      }
+
+      if (age === 'enrolled' || age === 'review') {
+        items.push({ priority: 'High', task: 'Review their current plan during Annual Enrollment (Oct 15 – Dec 7)', detail: 'Plans change every year. Premiums, formularies, and networks are updated annually. A plan that was right last year may not be the best fit this year.' });
+        items.push({ priority: 'Medium', task: 'Check whether their doctors are still in-network', detail: 'Provider networks change annually. Verify that all of their specialists accept the current plan before the AEP deadline.' });
+        if (rx === 'yes') {
+          items.push({ priority: 'Medium', task: 'Run a drug cost comparison for next year', detail: 'Medicare plan formularies change each year. Even if the same drugs are covered, the tier and copay can change. Use medicare.gov/plan-compare with their drug list.' });
+        }
+      }
+
+      if (health === 'yes') {
+        items.push({ priority: 'Medium', task: 'Verify specialist coverage and referral requirements', detail: 'If they see multiple specialists, a Medigap plan or Medicare Advantage plan with broad specialist access may serve them better. Confirm referral requirements for any Medicare Advantage plan.' });
+        items.push({ priority: 'Low', task: 'Ask about prior authorization requirements', detail: 'Some Medicare Advantage plans require prior authorization for specialist visits, procedures, or certain drugs. Know this before they need care urgently.' });
+      }
+
+      if (poa === 'yes') {
+        items.push({ priority: 'High', task: 'Ensure you have a valid, signed Power of Attorney on file with Medicare', detail: 'Without POA on file, Medicare and Social Security cannot discuss their account with you. Contact Medicare at 1-800-MEDICARE to add an authorized representative.' });
+        items.push({ priority: 'Medium', task: 'Set up access to their MyMedicare account', detail: 'medicare.gov accounts allow you to view claims, print summary notices, and manage information. You can be added as an authorized representative.' });
+      }
+
+      items.push({ priority: 'Low', task: 'Check for Medicare Savings Program eligibility', detail: 'If their income is limited, they may qualify for a program that pays their Part B premium or reduces cost-sharing. Use the Medicare Savings Program Calculator on this site.' });
+      items.push({ priority: 'Low', task: 'Ask about Extra Help for Part D costs', detail: 'Extra Help is a federal program that significantly reduces Part D drug costs for people with limited income and resources. Apply through Social Security at ssa.gov.' });
+
+      var html = '<h3>Your Caregiver Action Checklist</h3>';
+      html += '<p>' + items.length + ' action items based on their situation.</p>';
+
+      ['High', 'Medium', 'Low'].forEach(function (level) {
+        var filtered = items.filter(function (i) { return i.priority === level; });
+        if (filtered.length === 0) return;
+        var color = level === 'High' ? '#b00020' : level === 'Medium' ? '#0057a8' : '#444';
+        html += '<h4 style="color:' + color + ';">' + level + ' Priority</h4>';
+        html += '<table class="calc-table"><tr><th>Task</th><th>Why it matters</th></tr>';
+        filtered.forEach(function (item) {
+          html += '<tr><td><strong>' + item.task + '</strong></td><td>' + item.detail + '</td></tr>';
+        });
+        html += '</table>';
+      });
+
+      html += '<div class="quiz-cta"><p>Navigating Medicare for a family member is a lot to manage. A licensed Medicare agent can sit with you and your family member at no cost to review their options.</p><a href="/contact" class="quiz-cta-btn">Schedule a Family Consultation</a></div>';
+      html += '<p class="calc-disclaimer">This checklist is educational and based on general Medicare rules. Individual situations vary. Always verify enrollment deadlines and plan details at medicare.gov or through a licensed Medicare professional.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * 9. MEDICARE TRAVEL NETWORK RISK ASSESSMENT
+   * ========================================================================= */
+  function initTravelNetworkRisk(container) {
+    if (!container) return;
+
+    var outcomes = {
+      high_risk: {
+        title: 'High network risk — your travel plans may conflict with your coverage.',
+        body: 'Medicare Advantage plans use regional or local networks. If you spend significant time outside your plan\'s service area, you may only have access to emergency care at in-network rates. Routine care outside the network could cost you full price or be denied entirely. Medigap (Medicare Supplement) plans work with any Medicare-accepting doctor in the United States, which makes them a much better fit for frequent travelers or people who split time between states.',
+        cta: true
+      },
+      moderate_risk: {
+        title: 'Moderate network risk — some planning needed.',
+        body: 'Your situation carries some network risk. If you are on Medicare Advantage, confirm that your plan has national or broad regional coverage, or that your travel destinations fall within your plan\'s service area. Some Medicare Advantage plans offer national PPO networks that provide in-network access across the country, which reduces this risk significantly. Ask your plan for a service area map before you travel.',
+        cta: true
+      },
+      low_risk_ma: {
+        title: 'Your travel patterns are likely manageable with Medicare Advantage.',
+        body: 'Short or infrequent trips generally do not pose a major network problem. Most Medicare Advantage plans cover emergency and urgent care nationwide. For planned care while traveling, call your plan in advance to confirm what is covered and at what cost-sharing level outside your service area.',
+        cta: false
+      },
+      low_risk_medigap: {
+        title: 'Medigap is the right coverage for your travel lifestyle.',
+        body: 'Medigap plans cover services at any provider that accepts Original Medicare, anywhere in the United States. Since virtually all hospitals and most doctors accept Medicare, you have broad access wherever you travel. For international travel, Plans C, D, F, G, M, and N include emergency care abroad (80% of covered costs after a $250 deductible, up to a $50,000 lifetime maximum). Check your specific plan for details.',
+        cta: true
+      },
+      international: {
+        title: 'International travel requires special attention.',
+        body: 'Original Medicare and most Medicare Advantage plans do not cover care outside the United States. Some Medigap plans (C, D, F, G, M, N) include a foreign travel emergency benefit that covers 80% of emergency costs abroad after a $250 deductible, up to a $50,000 lifetime limit. For extended international travel, a dedicated travel health insurance policy may be needed to supplement your Medicare coverage. Talk to your agent about the right combination.',
+        cta: true
+      }
+    };
+
+    var steps = [
+      {
+        id: 'q1',
+        question: 'What type of Medicare coverage do you currently have or are considering?',
+        options: [
+          { label: 'Medicare Advantage', next: 'q_ma_travel' },
+          { label: 'Original Medicare + Medigap', outcome: 'low_risk_medigap' },
+          { label: 'Original Medicare only (no Medigap)', next: 'q_om_travel' },
+          { label: 'Not yet enrolled — evaluating options', next: 'q_travel_style' }
+        ]
+      },
+      {
+        id: 'q_ma_travel',
+        question: 'How often do you travel or spend time outside your home area?',
+        options: [
+          { label: 'Rarely — a trip or two a year', next: 'q_international' },
+          { label: 'Several times a year for a week or more', next: 'q_snow_bird' },
+          { label: 'I split time between two states or travel frequently', outcome: 'high_risk' }
+        ]
+      },
+      {
+        id: 'q_snow_bird',
+        question: 'Do you travel to the same region or destination regularly?',
+        options: [
+          { label: 'Yes — a specific state or region', outcome: 'moderate_risk' },
+          { label: 'No — varies a lot', outcome: 'high_risk' }
+        ]
+      },
+      {
+        id: 'q_om_travel',
+        question: 'Do you have any supplemental coverage for cost-sharing?',
+        options: [
+          { label: 'No — I pay my own deductibles and coinsurance', answer: '<p>Without a Medigap plan, you have no cap on out-of-pocket costs under Original Medicare. While you can see any Medicare-accepting provider nationwide, a serious illness or hospital stay could leave you with very large bills. Consider a Medigap plan to cap your exposure.</p>', cta: true },
+          { label: 'Yes — Medicaid or other assistance', outcome: 'low_risk_medigap' }
+        ]
+      },
+      {
+        id: 'q_travel_style',
+        question: 'What best describes your travel habits in retirement?',
+        options: [
+          { label: 'Mostly staying home, short trips occasionally', next: 'q_international' },
+          { label: 'Frequent domestic travel or living in two states', outcome: 'high_risk' },
+          { label: 'Significant international travel', outcome: 'international' }
+        ]
+      },
+      {
+        id: 'q_international',
+        question: 'Do you travel internationally?',
+        options: [
+          { label: 'Yes — at least once a year', outcome: 'international' },
+          { label: 'No — domestic only', outcome: 'low_risk_ma' }
+        ]
+      }
+    ];
+
+    var wrap = document.createElement('div');
+    wrap.className = 'calc-wrap';
+    wrap.innerHTML = '<p class="calc-desc">Medicare coverage works differently depending on how often you travel and where you go. Medicare Advantage plans have networks and service areas. Medigap plans work with any Medicare-accepting provider nationwide. This tool assesses your network risk based on your travel habits.</p>';
+    container.appendChild(wrap);
+    buildQuiz(wrap, steps, outcomes, '');
+  }
+
+  /* =========================================================================
+   * 10. MEDICARE PART D SHOPPING GUIDE TOOL
+   * ========================================================================= */
+  function initPartDShopping(container) {
+    if (!container) return;
+    container.innerHTML = `
+      <div class="calc-wrap">
+        <p class="calc-desc">
+          Part D drug plans are not all the same — and picking the wrong one can cost you
+          significantly more than the cheapest premium would suggest. This tool guides you
+          through the key factors to evaluate when shopping for a Part D plan, so you can
+          make an informed comparison on medicare.gov.
+        </p>
+
+        <div class="calc-fields">
+          <label>Are you currently enrolled in Part D?</label>
+          <select id="pd-status">
+            <option value="new">No — first time enrolling</option>
+            <option value="switching">Yes — thinking about switching plans</option>
+            <option value="reviewing">Yes — reviewing my current plan for next year</option>
+          </select>
+
+          <label>Do you take brand-name or specialty medications?</label>
+          <select id="pd-rx-type">
+            <option value="generics">Mostly or all generics</option>
+            <option value="some_brand">Some brand-name drugs</option>
+            <option value="specialty">Specialty or high-cost medications</option>
+          </select>
+
+          <label>How do you typically get your prescriptions?</label>
+          <select id="pd-pharmacy">
+            <option value="retail">Local retail pharmacy</option>
+            <option value="mail">Mail order (90-day supply)</option>
+            <option value="both">Both retail and mail order</option>
+          </select>
+
+          <label>Are you enrolled in Extra Help (Low Income Subsidy)?</label>
+          <select id="pd-lis">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+            <option value="unsure">Not sure</option>
+          </select>
+        </div>
+        <button id="pd-generate">Get My Shopping Guide</button>
+        <div id="pd-result" class="calc-result" style="display:none;"></div>
+      </div>
+    `;
+
+    document.getElementById('pd-generate').addEventListener('click', function () {
+      var status = document.getElementById('pd-status').value;
+      var rxType = document.getElementById('pd-rx-type').value;
+      var pharmacy = document.getElementById('pd-pharmacy').value;
+      var lis = document.getElementById('pd-lis').value;
+      var result = document.getElementById('pd-result');
+      result.style.display = 'block';
+
+      var html = '<h3>Your Part D Shopping Guide</h3>';
+
+      // LIS first — big impact
+      if (lis === 'yes') {
+        html += '<p class="calc-good-news">✓ You have Extra Help. Your Part D costs are already significantly reduced. When choosing a plan, focus on whether your specific drugs are on the formulary and whether your preferred pharmacy is in the plan\'s network. Premiums matter less for you since Extra Help subsidizes them.</p>';
+      } else if (lis === 'unsure') {
+        html += '<p>⚠ You may qualify for Extra Help and not know it. Extra Help pays for most Part D premiums, deductibles, and copays for people with limited income and resources. Apply at ssa.gov or through your local Social Security office. It takes about 30 minutes and can save you thousands per year.</p>';
+      }
+
+      html += '<h4>The 5 Things That Actually Determine Your True Cost</h4>';
+
+      html += '<table class="calc-table">';
+      html += '<tr><th>#</th><th>Factor</th><th>What to look for</th></tr>';
+      html += '<tr><td>1</td><td><strong>Monthly premium</strong></td><td>The most visible cost — but not the most important one for heavy drug users. A $0 premium plan with high drug copays can cost more than a $45 premium plan with lower copays.</td></tr>';
+      html += '<tr><td>2</td><td><strong>Annual deductible</strong></td><td>In 2025, the maximum Part D deductible is $590. Some plans waive it for generics. If you take brand-name drugs, a plan with a low or $0 deductible saves you money right at the start of the year.</td></tr>';
+      html += '<tr><td>3</td><td><strong>Drug formulary</strong></td><td>Each plan has its own drug list (formulary) with different tiers and copays. A drug covered at Tier 2 ($15) on one plan may be Tier 4 ($100+) on another. Always check the formulary for your specific drugs.</td></tr>';
+      html += '<tr><td>4</td><td><strong>Pharmacy network</strong></td><td>Part D plans negotiate preferred pricing with specific pharmacies. Your copay at a preferred pharmacy can be significantly lower than at a non-preferred one. Check whether your current pharmacy is preferred — not just in-network.</td></tr>';
+      html += '<tr><td>5</td><td><strong>Coverage gap and catastrophic phase</strong></td><td>Since 2024, the Part D coverage gap ("donut hole") has changed significantly. In 2025, your out-of-pocket maximum is $2,000 — after which you pay nothing for the rest of the year. This cap matters most if you take high-cost medications.</td></tr>';
+      html += '</table>';
+
+      html += '<h4>Tailored Tips for Your Situation</h4>';
+
+      if (rxType === 'generics') {
+        html += '<p>Since you mainly take generics, focus on plans with low or no deductible for generic drugs and preferred pricing at your pharmacy. Many low-premium plans work well for generic-only users. Premiums matter more for you since your per-drug costs are low.</p>';
+      } else if (rxType === 'some_brand') {
+        html += '<p>Brand-name drugs land on higher tiers (Tier 3–4) with higher copays. Run the drug cost comparison on medicare.gov using your actual drug list to find which plans place your specific brands on lower tiers. A slightly higher premium often pays for itself in lower drug copays.</p>';
+      } else if (rxType === 'specialty') {
+        html += '<p>Specialty drugs are Tier 5 on most formularies — the highest copay tier. Focus on whether your specific specialty drugs are on the formulary at all, what tier they are placed on, and whether the plan requires prior authorization or step therapy before covering them. The $2,000 out-of-pocket cap in 2025 is particularly valuable for specialty drug users.</p>';
+      }
+
+      if (pharmacy === 'mail') {
+        html += '<p>Mail order pharmacies almost always offer lower copays than retail, especially for 90-day supplies. Make sure the plan\'s preferred mail order pharmacy can fill your specific medications and that the plan does not require a prior authorization that would slow down your first fill.</p>';
+      } else if (pharmacy === 'retail') {
+        html += '<p>Check the plan\'s preferred retail pharmacy list carefully. The difference between a preferred and non-preferred pharmacy within the same plan can be $10 to $40 per drug per month. CVS, Walgreens, and Walmart are preferred pharmacies for many plans — but this varies.</p>';
+      }
+
+      if (status === 'switching') {
+        html += '<p><strong>Switching plans:</strong> You can switch Part D plans during the Annual Enrollment Period (October 15 – December 7). Your new coverage starts January 1. If you are switching to a plan with a deductible, remember that the clock resets on January 1 — you will owe the deductible before coverage kicks in.</p>';
+      }
+
+      if (status === 'reviewing') {
+        html += '<p><strong>Annual review tip:</strong> Do not assume your current plan is still the best fit. Formularies, premiums, and pharmacy networks change every year. Even if your plan seems fine, running the drug cost comparison on medicare.gov each October can surface a better option in a few minutes.</p>';
+      }
+
+      html += '<h4>How to Compare Plans on Medicare.gov</h4>';
+      html += '<ol style="padding-left:1.25rem;line-height:1.9;">';
+      html += '<li>Go to <a href="https://www.medicare.gov/plan-compare" target="_blank" rel="noopener">medicare.gov/plan-compare</a></li>';
+      html += '<li>Enter your zip code and indicate you want to see drug plans</li>';
+      html += '<li>Add your prescriptions (drug name, dosage, and quantity per fill)</li>';
+      html += '<li>Enter your preferred pharmacy</li>';
+      html += '<li>Sort results by "lowest drug + premium cost" — not just lowest premium</li>';
+      html += '<li>Check the Star Rating (4+ stars is a reliable target)</li>';
+      html += '</ol>';
+
+      html += '<div class="quiz-cta"><p>Want help running a drug cost comparison across every plan in your area? A licensed Medicare agent can do this for you at no cost.</p><a href="/contact" class="quiz-cta-btn">Get Help Comparing Part D Plans</a></div>';
+      html += '<p class="calc-disclaimer">Part D plan details, formularies, and costs change annually. Always verify your plan\'s drug coverage for the upcoming year at medicare.gov. Information here reflects 2025 Medicare Part D rules.</p>';
+
+      result.innerHTML = html;
+    });
+  }
+
+  /* =========================================================================
+   * REGISTRATION & SLUG MAP EXTENSION
+   * Attach each tool to a div ID when the page loads.
+   * ========================================================================= */
+  var TOOL_MAP = {
+    'medigap-fit':                 initMedigapFit,
+    'employer-coverage-comparison': initEmployerComparison,
+    'cost-scenario-planner':       initCostScenarioPlanner,
+    'late-penalty-checker':        initLatePenaltyChecker,
+    'doctor-drug-assessment':      initDoctorDrugAssessment,
+    'cobra-vs-medicare':           initCobraVsMedicare,
+    'document-gatherer':           initDocumentGatherer,
+    'caregiver-checklist':         initCaregiverChecklist,
+    'travel-network-risk':         initTravelNetworkRisk,
+    'part-d-shopping':             initPartDShopping
+  };
+
+  var SLUG_EXTENSIONS = {
+    'medigap-fit-assessment':              'medigap-fit',
+    'employer-coverage-vs-medicare':       'employer-coverage-comparison',
+    'employer-coverage-vs-medicare-comparison': 'employer-coverage-comparison',
+    'medicare-cost-scenario-planner':      'cost-scenario-planner',
+    'late-enrollment-penalty-checker':     'late-penalty-checker',
+    'doctor-and-drug-assessment':          'doctor-drug-assessment',
+    'doctor-drug-prescription-assessment': 'doctor-drug-assessment',
+    'cobra-vs-medicare':                   'cobra-vs-medicare',
+    'cobra-vs-medicare-tool':              'cobra-vs-medicare',
+    'document-gatherer':                   'document-gatherer',
+    'document-gatherer-builder':           'document-gatherer',
+    'caregiver-checklist':                 'caregiver-checklist',
+    'caregiver-checklist-builder':         'caregiver-checklist',
+    'medicare-travel-network-risk':        'travel-network-risk',
+    'medicare-travel-network-risk-assessment': 'travel-network-risk',
+    'medicare-part-d-shopping-tool':       'part-d-shopping',
+    'part-d-shopping-tool':                'part-d-shopping'
+  };
+
+  // Auto-init: find matching div by ID, or find div with data-tool attribute,
+  // or detect from URL slug
+  function autoInit() {
+    // Check div IDs directly
+    Object.keys(TOOL_MAP).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) {
+        TOOL_MAP[id](el);
+        return;
+      }
+      // data-tool attribute fallback
+      el = document.querySelector('[data-tool="' + id + '"]');
+      if (el) {
+        el.id = id;
+        TOOL_MAP[id](el);
+      }
+    });
+
+    // URL slug fallback (same pattern as main calculator-loader.js)
+    var slug = window.location.pathname.split('/').filter(Boolean).pop();
+    var divId = SLUG_EXTENSIONS[slug];
+    if (divId && TOOL_MAP[divId]) {
+      var el = document.getElementById(divId);
+      if (!el) {
+        el = document.querySelector('.div-id-field');
+        if (el) { el.id = divId; }
+      }
+      if (el && !el.dataset.initialized) {
+        el.dataset.initialized = '1';
+        TOOL_MAP[divId](el);
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoInit);
+  } else {
+    autoInit();
+  }
+  CALCULATORS['medigap-fit'] = function(container) { initMedigapFit(container || document.getElementById('medigap-fit')); };
+  CALCULATORS['employer-coverage-comparison'] = function(container) { initEmployerComparison(container || document.getElementById('employer-coverage-comparison')); };
+  CALCULATORS['cost-scenario-planner'] = function(container) { initCostScenarioPlanner(container || document.getElementById('cost-scenario-planner')); };
+  CALCULATORS['late-penalty-checker'] = function(container) { initLatePenaltyChecker(container || document.getElementById('late-penalty-checker')); };
+  CALCULATORS['doctor-drug-assessment'] = function(container) { initDoctorDrugAssessment(container || document.getElementById('doctor-drug-assessment')); };
+  CALCULATORS['cobra-vs-medicare'] = function(container) { initCobraVsMedicare(container || document.getElementById('cobra-vs-medicare')); };
+  CALCULATORS['document-gatherer'] = function(container) { initDocumentGatherer(container || document.getElementById('document-gatherer')); };
+  CALCULATORS['caregiver-checklist'] = function(container) { initCaregiverChecklist(container || document.getElementById('caregiver-checklist')); };
+  CALCULATORS['travel-network-risk'] = function(container) { initTravelNetworkRisk(container || document.getElementById('travel-network-risk')); };
+  CALCULATORS['part-d-shopping'] = function(container) { initPartDShopping(container || document.getElementById('part-d-shopping')); };
+
   var SLUG_MAP = {
     'hsa-compatibility': 'hsa-calculator',
     'iep-calculator': 'iep-calculator',
@@ -1817,6 +3190,16 @@
     'm3p-payment-smoothing': 'm3p-calculator',
     'm3p-calculator': 'm3p-calculator',
     'medicare-prescription-payment-plan-m3p-calculator': 'm3p-calculator',
+    'medigap-fit-assessment': 'medigap-fit',
+    'employer-coverage-vs-medicare': 'employer-coverage-comparison',
+    'medicare-cost-scenario-planner': 'cost-scenario-planner',
+    'late-enrollment-penalty-checker': 'late-penalty-checker',
+    'doctor-and-drug-assessment': 'doctor-drug-assessment',
+    'cobra-vs-medicare': 'cobra-vs-medicare',
+    'document-gatherer': 'document-gatherer',
+    'caregiver-checklist': 'caregiver-checklist',
+    'medicare-travel-network-risk': 'travel-network-risk',
+    'medicare-part-d-shopping-tool': 'part-d-shopping',
   };
 
   // Detect current page from URL slug
