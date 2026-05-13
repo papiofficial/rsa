@@ -104,6 +104,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // ─── Detect mode: auto-render (CMS pages) vs interactive (static page) ───────
   const interactiveContainer = document.getElementById('plan-comparison-tool');
+
+  // Webflow currently wraps the comparison UI in a form. This tool is not a lead form.
+  // Prevent dropdown/button interactions from submitting to Webflow Forms and emailing Peter.
+  const selectorsForm = document.getElementById('selectors');
+  if (selectorsForm) {
+    selectorsForm.addEventListener('submit', function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      return false;
+    });
+  }
+
   const presetWrapper = document.querySelector('[data-plan-1]');
   const slug1 = presetWrapper ? (presetWrapper.getAttribute('data-plan-1') || '') : '';
   const slug2 = presetWrapper ? (presetWrapper.getAttribute('data-plan-2') || '') : '';
@@ -126,20 +138,20 @@ document.addEventListener('DOMContentLoaded', function () {
   // ─── Problem 1: Interactive comparison tool (static page) ───────────────────
   if (!isAutoMode && interactiveContainer) {
     fetchPlans().then(plans => {
-      // (no preset — show interactive state/plan selectors)
-      // Extract unique states
+      // Show a real comparison on arrival. Users came here to compare, not to stare at empty controls.
       const states = [...new Set(plans.map(p => p.state))].filter(Boolean).sort();
+      const defaultState = states.includes('Utah') ? 'Utah' : states[0];
 
       interactiveContainer.innerHTML = `
         <div class="comp-interactive">
+          <p class="comp-helper">Showing a sample comparison. Change the state or either plan to update the table.</p>
           <div class="comp-fields">
             <label>State</label>
             <select id="comp-state">
-              <option value="">Select a state...</option>
-              ${states.map(s => `<option value="${s}">${s}</option>`).join('')}
+              ${states.map(s => `<option value="${s}" ${s === defaultState ? 'selected' : ''}>${s}</option>`).join('')}
             </select>
           </div>
-          <div class="comp-plan-selects" id="comp-plan-selects" style="display:none;">
+          <div class="comp-plan-selects" id="comp-plan-selects">
             <div class="comp-fields">
               <label>Plan A</label>
               <select id="comp-plan-a"><option value="">Select Plan A...</option></select>
@@ -149,41 +161,54 @@ document.addEventListener('DOMContentLoaded', function () {
               <select id="comp-plan-b"><option value="">Select Plan B...</option></select>
             </div>
           </div>
-          <button id="comp-compare" style="display:none;">Compare Plans</button>
+          <button id="comp-compare" type="button">Update Comparison</button>
           <div id="comp-result"></div>
         </div>
       `;
 
       const stateSelect = document.getElementById('comp-state');
-      const planSelects = document.getElementById('comp-plan-selects');
       const planASelect = document.getElementById('comp-plan-a');
       const planBSelect = document.getElementById('comp-plan-b');
       const compareBtn = document.getElementById('comp-compare');
       const resultDiv = document.getElementById('comp-result');
 
-      stateSelect.addEventListener('change', function () {
-        const state = this.value;
-        if (!state) { planSelects.style.display = 'none'; compareBtn.style.display = 'none'; return; }
-        const statePlans = plans.filter(p => p.state === state).sort((a, b) => a.name.localeCompare(b.name));
-        const opts = statePlans.map(p => `<option value="${p.slug}">${p.name} (${p.carrier})</option>`).join('');
-        planASelect.innerHTML = '<option value="">Select Plan A...</option>' + opts;
-        planBSelect.innerHTML = '<option value="">Select Plan B...</option>' + opts;
-        planSelects.style.display = 'block';
-        compareBtn.style.display = 'none';
-        resultDiv.innerHTML = '';
-      });
-
-      function checkReady() {
-        compareBtn.style.display = (planASelect.value && planBSelect.value && planASelect.value !== planBSelect.value) ? 'block' : 'none';
+      function plansForState(state) {
+        return plans.filter(p => p.state === state).sort((a, b) => a.name.localeCompare(b.name));
       }
-      planASelect.addEventListener('change', checkReady);
-      planBSelect.addEventListener('change', checkReady);
 
-      compareBtn.addEventListener('click', function () {
+      function populatePlansForState(state) {
+        const statePlans = plansForState(state);
+        const opts = statePlans.map(p => `<option value="${p.slug}">${p.name} (${p.carrier})</option>`).join('');
+        planASelect.innerHTML = opts;
+        planBSelect.innerHTML = opts;
+        if (statePlans[0]) planASelect.value = statePlans[0].slug;
+        if (statePlans[1]) planBSelect.value = statePlans[1].slug;
+        renderIfReady();
+      }
+
+      function renderIfReady() {
+        const ready = planASelect.value && planBSelect.value && planASelect.value !== planBSelect.value;
+        compareBtn.style.display = ready ? 'inline-block' : 'none';
+        if (!ready) {
+          resultDiv.innerHTML = '<p class="comp-empty">Choose two different plans to compare.</p>';
+          return;
+        }
         const plan1 = plans.find(p => p.slug === planASelect.value);
         const plan2 = plans.find(p => p.slug === planBSelect.value);
         if (plan1 && plan2) renderComparison(plan1, plan2, resultDiv);
+      }
+
+      stateSelect.addEventListener('change', function () {
+        populatePlansForState(this.value);
       });
+      planASelect.addEventListener('change', renderIfReady);
+      planBSelect.addEventListener('change', renderIfReady);
+      compareBtn.addEventListener('click', renderIfReady);
+
+      populatePlansForState(defaultState);
+    }).catch(err => {
+      interactiveContainer.innerHTML = '<p style="color:#888">Plan comparison data could not be loaded. Please refresh the page or contact Resting Sycamore for help comparing plans.</p>';
+      console.error('RSA: Plan comparison tool failed to load:', err);
     });
   }
 
