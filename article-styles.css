@@ -1,0 +1,28 @@
+/* Resting Sycamore Article Styles
+ * Upload to https://papiofficial.github.io/rsa/article-styles.css
+ * Then link in Webflow Project Settings -> Custom Code -> Head Code:
+ *   <link rel="stylesheet" href="https://papiofficial.github.io/rsa/article-styles.css">
+ * Wrap your CMS rich-text fields in <div class="rsa-article"> in the Webflow template.
+ */
+
+.rsa-article .stat-row { display: flex; gap: 16px; margin: 24px 0; flex-wrap: wrap; }
+.rsa-article .stat-box { flex: 1; min-width: 140px; background: #f0f4ff; border-radius: 8px; padding: 16px; text-align: center; }
+.rsa-article .stat-num { font-size: 1.7rem; font-weight: 700; color: #2c5dcd; }
+.rsa-article .stat-lbl { font-size: 0.8rem; color: #666; margin-top: 4px; }
+
+.rsa-article .chart-wrap,
+.rsa-article .key-numbers-chart { background: #f8f9fa; border-radius: 10px; padding: 22px 24px; margin: 28px 0; }
+.rsa-article .chart-wrap .chart-title,
+.rsa-article .key-numbers-chart .chart-title { font-size: 0.9rem; font-weight: 600; color: #555; margin-bottom: 14px; text-align: center; text-transform: uppercase; letter-spacing: 0.05em; }
+.rsa-article .chart-source { font-size: 0.78rem; color: #888; text-align: center; margin-top: 8px; }
+.rsa-article canvas { max-width: 100%; }
+
+.rsa-article .highlight { background: #fff3cd; border-left: 4px solid #e6a817; padding: 14px 18px; border-radius: 4px; margin: 24px 0; font-size: 0.97rem; line-height: 1.65; }
+
+.rsa-article .sources-block { background: #f4f7fb; border-left: 4px solid #2c5dcd; padding: 14px 20px; margin: 24px 0 16px 0; border-radius: 4px; font-size: 0.9rem; line-height: 1.6; }
+.rsa-article .sources-block ul.sources-list { padding-left: 22px; margin: 8px 0 0 0; list-style: disc; }
+.rsa-article .sources-block li { margin-bottom: 6px; }
+.rsa-article .sources-block a { color: #1c4cbd; }
+
+.rsa-article .disclaimer { font-size: 0.82rem; color: #888; border-top: 1px solid #eee; margin-top: 40px; padding-top: 16px; line-height: 1.6; }
+.rsa-article .source { font-size: 0.82rem; color: #aaa; margin-top: 8px; }
