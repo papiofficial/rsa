@@ -3163,6 +3163,62 @@
   } else {
     autoInit();
   }
+
+  function normalizeLegacyInternalLinks() {
+    var statePlanHubs = {
+      '/medicare/plans/ohio': true,
+      '/medicare/plans/utah': true,
+      '/medicare/plans/pennsylvania': true
+    };
+
+    var leafPattern = /^\/medicare\/(zip-codes|question|plan-type|plan|doctor|provider|carrier|carriers|specialty|specialties)\/[^/?#]+\/$/;
+
+    Array.prototype.forEach.call(document.querySelectorAll('a[href]'), function(anchor) {
+      var raw = anchor.getAttribute('href');
+      if (!raw || raw.charAt(0) === '#' || /^(mailto|tel|sms):/i.test(raw)) return;
+
+      var url;
+      try {
+        url = new URL(raw, window.location.origin);
+      } catch (e) {
+        return;
+      }
+
+      var isInternal = raw.charAt(0) === '/' || url.hostname === window.location.hostname || url.hostname === 'www.restingsycamore.com' || url.hostname === 'restingsycamore.com';
+      if (!isInternal) return;
+
+      var nextPath = url.pathname.replace(/\/+/g, '/');
+
+      if (nextPath.indexOf('/medicare/plans/') === 0 && !statePlanHubs[nextPath]) {
+        nextPath = nextPath.replace('/medicare/plans/', '/medicare/plan/');
+      }
+      if (nextPath.indexOf('/medicare/plan-types/') === 0) {
+        nextPath = nextPath.replace('/medicare/plan-types/', '/medicare/plan-type/');
+      }
+      if (nextPath.indexOf('/resources/calculators/') === 0) {
+        nextPath = nextPath.replace('/resources/calculators/', '/medicare/resources/interactive-tools/');
+      }
+      if (leafPattern.test(nextPath)) {
+        nextPath = nextPath.slice(0, -1);
+      }
+
+      if (nextPath === url.pathname) return;
+
+      var next = nextPath + url.search + url.hash;
+      if (/^https?:\/\//i.test(raw)) {
+        next = url.origin + next;
+      } else if (raw.indexOf('//') === 0) {
+        next = '//' + url.host + next;
+      }
+      anchor.setAttribute('href', next);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', normalizeLegacyInternalLinks);
+  } else {
+    normalizeLegacyInternalLinks();
+  }
   CALCULATORS['medigap-fit'] = function(container) { initMedigapFit(container || document.getElementById('medigap-fit')); };
   CALCULATORS['employer-coverage-comparison'] = function(container) { initEmployerComparison(container || document.getElementById('employer-coverage-comparison')); };
   CALCULATORS['cost-scenario-planner'] = function(container) { initCostScenarioPlanner(container || document.getElementById('cost-scenario-planner')); };
